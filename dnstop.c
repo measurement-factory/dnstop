@@ -151,7 +151,8 @@ AgentAddr *Destinations = NULL;
 StringCounter *Tlds = NULL;
 StringCounter *Slds = NULL;
 StringCounter *Nlds = NULL;
-StringAddrCounter *SSC = NULL;
+StringAddrCounter *SSC2 = NULL;
+StringAddrCounter *SSC3 = NULL;
 #ifdef __OpenBSD__
 struct bpf_timeval last_ts;
 #else
@@ -485,7 +486,7 @@ handle_dns(const char *buf, int len, const struct in_addr sip, const struct in_a
 	sc->count++;
 
 	/* increment StringAddrCounter */
-	ssc = StringAddrCounter_lookup_or_add(&SSC, sip, s);
+	ssc = StringAddrCounter_lookup_or_add(&SSC2, sip, s);
 	ssc->count++;
 
     }
@@ -495,7 +496,7 @@ handle_dns(const char *buf, int len, const struct in_addr sip, const struct in_a
         sc->count++;
 
         /* increment StringAddrCounter */
-        ssc = StringAddrCounter_lookup_or_add(&SSC, sip, s);
+        ssc = StringAddrCounter_lookup_or_add(&SSC3, sip, s);
         ssc->count++;
 
     }
@@ -642,7 +643,8 @@ cron_pre(void)
     StringCounter_sort(&Tlds);
     StringCounter_sort(&Slds);
     StringCounter_sort(&Nlds);
-    StringAddrCounter_sort(&SSC);
+    StringAddrCounter_sort(&SSC2);
+    StringAddrCounter_sort(&SSC3);
 }
 
 void
@@ -675,6 +677,7 @@ keyboard(void)
 	SubReport = Nld_report;
 	break;
     case 'c':
+    case '@':
 	SubReport = SldBySource_report;
 	break;
     case '#':
@@ -710,7 +713,8 @@ Help_report(void)
     print_func(" 1 - TLD list\n");
     print_func(" 2 - SLD list\n");
     print_func(" 3 - 3LD list\n");
-    print_func(" c - SLD+Sources list\n");
+    print_func(" @ - SLD+Sources list\n");
+    print_func(" # - 3LD+Sources list\n");
     print_func("^R - Reset counters\n");
     print_func("^X - Exit\n");
     print_func("\n");
@@ -958,7 +962,7 @@ SldBySource_report(void)
 	print_func("\tYou must start %s with the -s option\n", progname);
 	print_func("\tto collect 2nd level domain stats.\n", progname);
     } else {
-	Combo_report(SSC, "Source", "SLD");
+	Combo_report(SSC2, "Source", "SLD");
     }
 }
 
@@ -969,7 +973,7 @@ NldBySource_report(void)
         print_func("\tYou must start %s with the -t option\n", progname);
         print_func("\tto collect 3nd level domain stats.\n", progname);
     } else {
-        Combo_report(SSC, "Source", "3LD");
+        Combo_report(SSC3, "Source", "3LD");
     }
 }
 
@@ -1111,7 +1115,8 @@ ResetCounters(void)
     StringCounter_free(&Tlds);
     StringCounter_free(&Slds);
     StringCounter_free(&Nlds);
-    StringAddrCounter_free(&SSC);
+    StringAddrCounter_free(&SSC2);
+    StringAddrCounter_free(&SSC3);
     memset(&last_ts, '\0', sizeof(last_ts));
 }
 
