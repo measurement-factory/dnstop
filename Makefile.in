@@ -2,10 +2,13 @@ CFLAGS=-g -Wall
 PROG=dnstop
 CC=gcc
 
+# You may need to uncomment this, esp on Solaris
+XTRALIBS= # -lnsl -lresolv -lsocket
+
 all: $(PROG)
 
 $(PROG): $(PROG).o
-	$(CC) $(CFLAGS) -o $@ $(PROG).o -lpcap -lcurses
+	$(CC) $(CFLAGS) -o $@ $(PROG).o -lpcap -lcurses $(XTRALIBS)
 
 clean:
 	rm -f $(PROG) $(PROG).o $(PROG).core $(PROG).c~

@@ -29,6 +29,11 @@
 
 #define PCAP_SNAPLEN 1460
 #define MAX_QNAME_SZ 512
+#ifndef ETHER_HDR_LEN
+#define ETHER_ADDR_LEN 6
+#define ETHER_TYPE_LEN 2
+#define ETHER_HDR_LEN (ETHER_ADDR_LEN * 2 + ETHER_TYPE_LEN)
+#endif
 
 #if USE_PPP
 #include <net/if_ppp.h>
@@ -101,6 +106,9 @@ AnonMap *Anons = NULL;
 #define T_MAX 65536
 #ifndef T_A6
 #define T_A6 38
+#endif
+#ifndef T_SRV
+#define T_SRV 33
 #endif
 #define C_MAX 65536
 
