@@ -67,6 +67,15 @@ struct _StringCounter {
     StringCounter *next;
 };
 
+/* This struct cobbles together Source and Sld */
+typedef struct _StringAddrCounter StringAddrCounter;
+struct _StringAddrCounter {
+    struct in_addr src;
+    char *str;
+    int count;
+    StringAddrCounter *next;
+};
+
 typedef struct _foo foo;
 struct _foo {
     int cnt;
@@ -128,12 +137,15 @@ AgentAddr *Sources = NULL;
 AgentAddr *Destinations = NULL;
 StringCounter *Tlds = NULL;
 StringCounter *Slds = NULL;
+StringAddrCounter *SSC = NULL;
 #ifdef __OpenBSD__
 struct bpf_timeval last_ts;
 #else
 struct timeval last_ts;
 #endif
 
+/* Prototypes */
+void SldBySource_report(void);
 void Sources_report(void);
 void Destinatioreport(void);
 void Qtypes_report(void);
@@ -184,6 +196,20 @@ StringCounter_lookup_or_add(StringCounter ** headP, const char *s)
 	    return (*T);
     (*T) = calloc(1, sizeof(**T));
     (*T)->s = strdup(s);
+    return (*T);
+}
+
+StringAddrCounter *
+StringAddrCounter_lookup_or_add(StringAddrCounter ** headP, struct in_addr a, const char *str)
+{
+    StringAddrCounter **T;
+    for (T = headP; (*T); T = &(*T)->next)
+	if (0 == strcmp((*T)->str, str))
+	    if ((*T)->src.s_addr == a.s_addr)
+		return (*T);
+    (*T) = calloc(1, sizeof(**T));
+    (*T)->str = strdup(str);
+    (*T)->src = a;
     return (*T);
 }
 
@@ -253,6 +279,31 @@ StringCounter_sort(StringCounter ** headP)
     *headP = NULL;
 }
 
+void
+StringAddrCounter_sort(StringAddrCounter ** headP)
+{
+    foo *sortme;
+    int n_things = 0;
+    int i;
+    StringAddrCounter *ssc;
+    for (ssc = *headP; ssc; ssc = ssc->next)
+	n_things++;
+    sortme = calloc(n_things, sizeof(foo));
+    n_things = 0;
+    for (ssc = *headP; ssc; ssc = ssc->next) {
+	sortme[n_things].cnt = ssc->count;
+	sortme[n_things].ptr = ssc;
+	n_things++;
+    }
+    qsort(sortme, n_things, sizeof(foo), foo_cmp);
+    for (i = 0; i < n_things; i++) {
+	*headP = sortme[i].ptr;
+	headP = &(*headP)->next;
+    }
+    free(sortme);
+    *headP = NULL;
+}
+
 #define RFC1035_MAXLABELSZ 63
 static int
 rfc1035NameUnpack(const char *buf, size_t sz, off_t * off, char *name, size_t ns
@@ -309,7 +360,7 @@ rfc1035NameUnpack(const char *buf, size_t sz, off_t * off, char *name, size_t ns
 }
 
 int
-handle_dns(const char *buf, int len)
+handle_dns(const char *buf, int len, const struct in_addr sip)
 {
     rfc1035_header qh;
     unsigned short us;
@@ -320,6 +371,7 @@ handle_dns(const char *buf, int len)
     char *t;
     int x;
     StringCounter *sc;
+    StringAddrCounter *ssc;
 
     if (len < sizeof(qh))
 	return 0;
@@ -391,18 +443,23 @@ handle_dns(const char *buf, int len)
 	    t++;
 	sc = StringCounter_lookup_or_add(&Slds, t);
 	sc->count++;
+
+	/* increment StringAddrCounter */
+	ssc = StringAddrCounter_lookup_or_add(&SSC, sip, t);
+	ssc->count++;
+
     }
     return 1;
 }
 
 int
-handle_udp(const struct udphdr *udp, int len)
+handle_udp(const struct udphdr *udp, int len, struct in_addr sip)
 {
     char buf[PCAP_SNAPLEN];
     if (port53 != udp->uh_dport)
 	return 0;
     memcpy(buf, udp + 1, len - sizeof(*udp));
-    if (0 == handle_dns(buf, len - sizeof(*udp)))
+    if (0 == handle_dns(buf, len - sizeof(*udp), sip))
 	return 0;
     return 1;
 }
@@ -420,7 +477,7 @@ handle_ip(const struct ip *ip, int len)
     if (IPPROTO_UDP != ip->ip_p)
 	return 0;
     memcpy(buf, (void *) ip + offset, len - offset);
-    if (0 == handle_udp((struct udphdr *) buf, len - offset))
+    if (0 == handle_udp((struct udphdr *) buf, len - offset, ip->ip_src))
 	return 0;
     clt = AgentAddr_lookup_or_add(&Sources, ip->ip_src);
     clt->count++;
@@ -524,6 +581,7 @@ cron_pre(void)
     AgentAddr_sort(&Destinations);
     StringCounter_sort(&Tlds);
     StringCounter_sort(&Slds);
+    StringAddrCounter_sort(&SSC);
 }
 
 void
@@ -553,6 +611,9 @@ keyboard(void)
     case '2':
 	SubReport = Sld_report;
 	break;
+    case 'c':
+	SubReport = SldBySource_report;
+	break;
     case 't':
 	SubReport = Qtypes_report;
 	break;
@@ -573,11 +634,12 @@ keyboard(void)
 void
 Help_report(void)
 {
-    printw(" S - Sources list\n");
-    printw(" D - Destinations list\n");
-    printw(" T - Query types\n");
+    printw(" s - Sources list\n");
+    printw(" d - Destinations list\n");
+    printw(" t - Query types\n");
     printw(" 1 - TLD list\n");
     printw(" 2 - SLD list\n");
+    printw(" c - SLD+Sources list\n");
     printw("^R - Reset counters\n");
     printw("^X - Exit\n");
     printw("\n");
@@ -668,6 +730,18 @@ StringCounter_free(StringCounter ** headP)
     }
     *headP = NULL;
 }
+void
+StringAddrCounter_free(StringAddrCounter ** headP)
+{
+    StringAddrCounter *ssc;
+    void *next;
+    for (ssc = *headP; ssc; ssc = next) {
+	next = ssc->next;
+	free(ssc->str);
+	free(ssc);
+    }
+    *headP = NULL;
+}
 
 void
 Tld_report(void)
@@ -719,6 +793,36 @@ AgentAddr_report(AgentAddr * list, const char *what)
 	    100.0 * agent->count / query_count_total);
 	if (0 == --nlines)
 	    break;
+    }
+}
+
+void
+Combo_report(StringAddrCounter * list, char *what1, char *what2)
+{
+    StringAddrCounter *ssc;
+    int nlines = getmaxy(w) - 6;
+    printw("%-16s %-32s %9s %6s\n", what1, what2, "count", "%");
+    printw("%-16s %-32s %9s %6s\n",
+	"----------------", "--------------------", "---------", "------");
+    for (ssc = list; ssc; ssc = ssc->next) {
+	printw("%-16s %-32s %9d %6.1f\n",
+	    anon_inet_ntoa(ssc->src),
+	    ssc->str,
+	    ssc->count,
+	    100.0 * ssc->count / query_count_total);
+	if (0 == --nlines)
+	    break;
+    }
+}
+
+void
+SldBySource_report(void)
+{
+    if (0 == sld_flag) {
+	printw("\tYou must start %s with the -s option\n", progname);
+	printw("\tto collect 2nd level domain stats.\n", progname);
+    } else {
+	Combo_report(SSC, "Source", "SLD");
     }
 }
 
@@ -785,6 +889,7 @@ ResetCounters(void)
     AgentAddr_free(&Destinations);
     StringCounter_free(&Tlds);
     StringCounter_free(&Slds);
+    StringAddrCounter_free(&SSC);
     memset(&last_ts, '\0', sizeof(last_ts));
 }
 
