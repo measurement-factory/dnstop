@@ -97,6 +97,7 @@ void Qtypes_report(void);
 void Tld_report(void);
 void Sld_report(void);
 void Help_report(void);
+void ResetCounters(void);
 
 struct in_addr
 AnonMap_lookup_or_add(AnonMap ** headP, struct in_addr real)
@@ -442,8 +443,11 @@ keyboard(void)
     case 't':
 	SubReport = Qtypes_report;
 	break;
-    case 'q':
+    case 021:
 	Quit = 1;
+	break;
+    case 022:
+	ResetCounters();
 	break;
     case '?':
 	SubReport = Help_report;
@@ -456,12 +460,13 @@ keyboard(void)
 void
 Help_report(void)
 {
-    printw("s - Sources list\n");
-    printw("d - Destinations list\n");
-    printw("t - Query types\n");
-    printw("1 - TLD list\n");
-    printw("2 - SLD list\n");
-    printw("q - Quit\n");
+    printw(" S - Sources list\n");
+    printw(" D - Destinations list\n");
+    printw(" T - Query types\n");
+    printw(" 1 - TLD list\n");
+    printw(" 2 - SLD list\n");
+    printw("^R - Reset counters\n");
+    printw("^Q - Quit\n");
     printw("\n");
     printw("? - this\n");
 }
@@ -539,6 +544,19 @@ StringCounter_report(StringCounter * list, char *what)
 }
 
 void
+StringCounter_free(StringCounter **headP)
+{
+    StringCounter *sc;
+    void *next;
+    for(sc=*headP; sc; sc=next) {
+	next = sc->next;
+	free(sc->s);
+	free(sc);
+    }
+    *headP = NULL;
+}
+
+void
 Tld_report(void)
 {
     StringCounter_report(Tlds, "TLD");
@@ -587,6 +605,18 @@ AgentAddr_report(AgentAddr * list, const char *what)
 }
 
 void
+AgentAddr_free(AgentAddr **headP)
+{
+    AgentAddr *aa;
+    void *next;
+    for(aa=*headP; aa; aa=next) {
+	next = aa->next;
+	free(aa);
+    }
+    *headP = NULL;
+}
+
+void
 Sources_report(void)
 {
     AgentAddr_report(Sources, "Sources");
@@ -626,6 +656,20 @@ init_curses(void)
 }
 
 void
+ResetCounters(void)
+{
+    query_count_intvl = 0;
+    query_count_total = 0;
+    memset(qtype_counts, '\0', sizeof(qtype_counts));
+    memset(qclass_counts, '\0', sizeof(qclass_counts));
+    AgentAddr_free(&Sources);
+    AgentAddr_free(&Destinations);
+    StringCounter_free(&Tlds);
+    StringCounter_free(&Slds);
+    memset(&last_ts, '\0', sizeof(last_ts));
+}
+
+void
 usage(void)
 {
     fprintf(stderr, "usage: %s [-a] [-i addr] [-p expr] netdevice|savefile\n",
@@ -649,8 +693,8 @@ main(int argc, char *argv[])
     SubReport = Sources_report;
     ignore_addr.s_addr = 0;
     progname = strdup(strrchr(argv[0], '/') ? strchr(argv[0], '/') + 1 : argv[0]);
-    memset(&last_ts, '\0', sizeof(last_ts));
     srandom(time(NULL));
+    ResetCounters();
 
     while ((x = getopt(argc, argv, "asp:i:")) != -1) {
 	switch (x) {
