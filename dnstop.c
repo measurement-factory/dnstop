@@ -42,6 +42,9 @@
 #define ETHER_TYPE_LEN 2
 #define ETHER_HDR_LEN (ETHER_ADDR_LEN * 2 + ETHER_TYPE_LEN)
 #endif
+#ifndef ETHERTYPE_8021Q
+#define ETHERTYPE_8021Q 0x8100
+#endif
 
 #if USE_PPP
 #include <net/if_ppp.h>
@@ -153,6 +156,16 @@ void Tld_report(void);
 void Sld_report(void);
 void Help_report(void);
 void ResetCounters(void);
+
+typedef int Filter_t(unsigned short,
+	unsigned short,
+	const char *,
+	const struct in_addr,
+	const struct in_addr);
+Filter_t UnknownTldFilter;
+Filter_t AforAFilter;
+Filter_t RFC1918PtrFilter;
+Filter_t *Filter = NULL;
 
 struct in_addr
 AnonMap_lookup_or_add(AnonMap ** headP, struct in_addr real)
@@ -359,8 +372,36 @@ rfc1035NameUnpack(const char *buf, size_t sz, off_t * off, char *name, size_t ns
     return 0;
 }
 
+const char *
+QnameToTld(const char *qname)
+{
+    const char *t = strrchr(qname, '.');
+    if (NULL == t)
+	t = qname;
+    if (t > qname)
+	t++;
+    return t;
+}
+
+const char *
+QnameToSld(const char *qname)
+{
+    const char *t = strrchr(qname, '.');
+    int dotcount = 1;
+    if (NULL == t)
+	t = qname;
+    while (t > qname && dotcount < 2) {
+	t--;
+	if ('.' == *t)
+	    dotcount++;
+    }
+    if (t > qname)
+	t++;
+    return t;
+}
+
 int
-handle_dns(const char *buf, int len, const struct in_addr sip)
+handle_dns(const char *buf, int len, const struct in_addr sip, const struct in_addr dip)
 {
     rfc1035_header qh;
     unsigned short us;
@@ -369,6 +410,7 @@ handle_dns(const char *buf, int len, const struct in_addr sip)
     unsigned short qclass;
     off_t offset;
     char *t;
+    const char *s;
     int x;
     StringCounter *sc;
     StringAddrCounter *ssc;
@@ -420,32 +462,24 @@ handle_dns(const char *buf, int len, const struct in_addr sip)
     memcpy(&us, buf + offset + 2, 2);
     qclass = ntohs(us);
 
+    if (Filter && 0 == Filter(qtype, qclass, qname, sip, dip))
+	return 0;
+
     /* gather stats */
     qtype_counts[qtype]++;
     qclass_counts[qclass]++;
 
-    t = strrchr(qname, '.');
-    if (NULL == t)
-	t = qname;
-    if (t > qname)
-	t++;
-    sc = StringCounter_lookup_or_add(&Tlds, t);
+    s = QnameToTld(qname);
+    sc = StringCounter_lookup_or_add(&Tlds, s);
     sc->count++;
 
     if (sld_flag) {
-	int dotcount = 0;
-	while (t > qname && dotcount < 2) {
-	    t--;
-	    if ('.' == *t)
-		dotcount++;
-	}
-	if (t > qname)
-	    t++;
-	sc = StringCounter_lookup_or_add(&Slds, t);
+	s = QnameToSld(qname);
+	sc = StringCounter_lookup_or_add(&Slds, s);
 	sc->count++;
 
 	/* increment StringAddrCounter */
-	ssc = StringAddrCounter_lookup_or_add(&SSC, sip, t);
+	ssc = StringAddrCounter_lookup_or_add(&SSC, sip, s);
 	ssc->count++;
 
     }
@@ -453,13 +487,13 @@ handle_dns(const char *buf, int len, const struct in_addr sip)
 }
 
 int
-handle_udp(const struct udphdr *udp, int len, struct in_addr sip)
+handle_udp(const struct udphdr *udp, int len, struct in_addr sip, struct in_addr dip)
 {
     char buf[PCAP_SNAPLEN];
     if (port53 != udp->uh_dport)
 	return 0;
     memcpy(buf, udp + 1, len - sizeof(*udp));
-    if (0 == handle_dns(buf, len - sizeof(*udp), sip))
+    if (0 == handle_dns(buf, len - sizeof(*udp), sip, dip))
 	return 0;
     return 1;
 }
@@ -477,7 +511,7 @@ handle_ip(const struct ip *ip, int len)
     if (IPPROTO_UDP != ip->ip_p)
 	return 0;
     memcpy(buf, (void *) ip + offset, len - offset);
-    if (0 == handle_udp((struct udphdr *) buf, len - offset, ip->ip_src))
+    if (0 == handle_udp((struct udphdr *) buf, len - offset, ip->ip_src, ip->ip_dst))
 	return 0;
     clt = AgentAddr_lookup_or_add(&Sources, ip->ip_src);
     clt->count++;
@@ -556,10 +590,20 @@ handle_ether(const u_char * pkt, int len)
 {
     char buf[PCAP_SNAPLEN];
     struct ether_header *e = (void *) pkt;
-    if (ETHERTYPE_IP != ntohs(e->ether_type))
+    unsigned short etype = ntohs(e->ether_type);
+    if (len < ETHER_HDR_LEN)
+        return 0;
+    pkt += ETHER_HDR_LEN;
+    len -= ETHER_HDR_LEN;
+    if (ETHERTYPE_8021Q == etype) {
+        etype = ntohs(*(unsigned short *) (pkt + 2));
+        pkt += 4;
+        len -= 4;
+    }
+    if (ETHERTYPE_IP != etype)
 	return 0;
-    memcpy(buf, pkt + ETHER_HDR_LEN, len - ETHER_HDR_LEN);
-    return handle_ip((struct ip *) buf, len - ETHER_HDR_LEN);
+    memcpy(buf, pkt, len);
+    return handle_ip((struct ip *) buf, len);
 }
 
 void
@@ -869,6 +913,76 @@ report(void)
     refresh();
 }
 
+/*
+ * === BEGIN FILTERS ==========================================================
+ */
+
+#include "known_tlds.h"
+
+int
+UnknownTldFilter(unsigned short qt, unsigned short qc, const char *qn, const struct in_addr sip, const struct in_addr dip)
+{
+    const char *tld = QnameToTld(qn);
+    unsigned int i;
+    if (NULL == tld)
+	return 1;		/* tld is unknown */
+    for (i = 0; KnownTLDS[i]; i++)
+	if (0 == strcmp(KnownTLDS[i], tld))
+	    return 0;		/* tld is known */
+    return 1;			/* tld is unknown */
+}
+
+int
+AforAFilter(unsigned short qt, unsigned short qc, const char *qn, const struct in_addr sip, const struct in_addr dip)
+{
+    struct in_addr a;
+    return inet_aton(qn, &a);
+}
+
+int
+RFC1918PtrFilter(unsigned short qt, unsigned short qc, const char *qn, const struct in_addr sip, const struct in_addr dip)
+{
+    char *t;
+    char q[128];   
+    unsigned int i = 0;
+    if (qt != T_PTR)
+        return 0;  
+    strncpy(q, qn, sizeof(q)-1);
+    q[sizeof(q)-1] = '\0';
+    t = strstr(q, ".in-addr.arpa");
+    if (NULL == t)
+        return 0;
+    *t = '\0';
+    for (t = strtok(q, "."); t; t = strtok(NULL, ".")) {
+        i >>= 8;
+        i |= ((atoi(t) & 0xff) << 24);
+    }
+    if ((i & 0xff000000) == 0x0a000000)
+        return 1;
+    if ((i & 0xfff00000) == 0xac100000)
+        return 1;
+    if ((i & 0xffff0000) == 0xc0a80000)
+        return 1;
+    return 0;
+}
+
+void
+set_filter(const char *fn)
+{
+	if (0 == strcmp(fn, "unknown-tlds"))
+		Filter = UnknownTldFilter;
+	if (0 == strcmp(fn, "A-for-A"))
+		Filter = AforAFilter;
+	if (0 == strcmp(fn, "rfc1918-ptr"))
+		Filter = RFC1918PtrFilter;
+	else
+		Filter = NULL;
+}
+
+/*
+ * === END FILTERS ==========================================================
+ */
+
 void
 init_curses(void)
 {
@@ -903,6 +1017,12 @@ usage(void)
     fprintf(stderr, "\t-i addr\tIgnore this source IP address\n");
     fprintf(stderr, "\t-p\tDon't put interface in promiscuous mode\n");
     fprintf(stderr, "\t-s\tEnable 2nd level domain stats collection\n");
+    fprintf(stderr, "\t-f\tfilter-name\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Available filters:\n");
+    fprintf(stderr, "\tunknown-tlds\n");
+    fprintf(stderr, "\tA-for-A\n");
+    fprintf(stderr, "\trfc1918-ptr\n");
     exit(1);
 }
 
@@ -934,7 +1054,7 @@ main(int argc, char *argv[])
     srandom(time(NULL));
     ResetCounters();
 
-    while ((x = getopt(argc, argv, "ab:i:ps")) != -1) {
+    while ((x = getopt(argc, argv, "ab:f:i:ps")) != -1) {
 	switch (x) {
 	case 'a':
 	    anon_flag = 1;
@@ -950,6 +1070,9 @@ main(int argc, char *argv[])
 	    break;
 	case 'i':
 	    ignore_addr.s_addr = inet_addr(optarg);
+	    break;
+	case 'f':
+	    set_filter(optarg);
 	    break;
 	default:
 	    usage();
