@@ -120,6 +120,7 @@ int Quit = 0;
 char *progname = NULL;
 int anon_flag = 0;
 int sld_flag = 0;
+int nld_flag = 0;
 int promisc_flag = 1;
 AnonMap *Anons = NULL;
 
@@ -149,6 +150,7 @@ AgentAddr *Sources = NULL;
 AgentAddr *Destinations = NULL;
 StringCounter *Tlds = NULL;
 StringCounter *Slds = NULL;
+StringCounter *Nlds = NULL;
 StringAddrCounter *SSC = NULL;
 #ifdef __OpenBSD__
 struct bpf_timeval last_ts;
@@ -158,12 +160,14 @@ struct timeval last_ts;
 
 /* Prototypes */
 void SldBySource_report(void);
+void NldBySource_report(void);
 void Sources_report(void);
 void Destinatioreport(void);
 void Qtypes_report(void);
 void Opcodes_report(void);
 void Tld_report(void);
 void Sld_report(void);
+void Nld_report(void);
 void Help_report(void);
 void ResetCounters(void);
 
@@ -485,6 +489,16 @@ handle_dns(const char *buf, int len, const struct in_addr sip, const struct in_a
 	ssc->count++;
 
     }
+    if (nld_flag) {
+        s = QnameToNld(qname, 3);
+        sc = StringCounter_lookup_or_add(&Nlds, s);
+        sc->count++;
+
+        /* increment StringAddrCounter */
+        ssc = StringAddrCounter_lookup_or_add(&SSC, sip, s);
+        ssc->count++;
+
+    }
     return 1;
 }
 
@@ -627,6 +641,7 @@ cron_pre(void)
     AgentAddr_sort(&Destinations);
     StringCounter_sort(&Tlds);
     StringCounter_sort(&Slds);
+    StringCounter_sort(&Nlds);
     StringAddrCounter_sort(&SSC);
 }
 
@@ -656,8 +671,14 @@ keyboard(void)
     case '2':
 	SubReport = Sld_report;
 	break;
+    case '3':
+	SubReport = Nld_report;
+	break;
     case 'c':
 	SubReport = SldBySource_report;
+	break;
+    case '#':
+	SubReport = NldBySource_report;
 	break;
     case 't':
 	SubReport = Qtypes_report;
@@ -688,6 +709,7 @@ Help_report(void)
     print_func(" o - Opcodes\n");
     print_func(" 1 - TLD list\n");
     print_func(" 2 - SLD list\n");
+    print_func(" 3 - 3LD list\n");
     print_func(" c - SLD+Sources list\n");
     print_func("^R - Reset counters\n");
     print_func("^X - Exit\n");
@@ -790,11 +812,11 @@ StringCounter_report(StringCounter * list, char *what)
 {
     StringCounter *sc;
     int nlines = get_nlines();
-    print_func("%-20s %9s %6s\n", what, "count", "%");
-    print_func("%-20s %9s %6s\n",
-	"--------------------", "---------", "------");
+    print_func("%-30s %9s %6s\n", what, "count", "%");
+    print_func("%-30s %9s %6s\n",
+	"------------------------------", "---------", "------");
     for (sc = list; sc; sc = sc->next) {
-	print_func("%-20.20s %9d %6.1f\n",
+	print_func("%-30.30s %9d %6.1f\n",
 	    sc->s,
 	    sc->count,
 	    100.0 * sc->count / query_count_total);
@@ -842,6 +864,16 @@ Sld_report(void)
 	print_func("\tto collect 2nd level domain stats.\n", progname);
     } else {
 	StringCounter_report(Slds, "SLD");
+    }
+}
+void
+Nld_report(void)
+{
+    if (0 == nld_flag) {
+        print_func("\tYou must start %s with the -t option\n", progname);
+        print_func("\tto collect 3nd level domain stats.\n", progname);
+    } else {
+        StringCounter_report(Nlds, "3LD");
     }
 }
 
@@ -929,6 +961,18 @@ SldBySource_report(void)
 	Combo_report(SSC, "Source", "SLD");
     }
 }
+
+void
+NldBySource_report(void)
+{
+    if (0 == nld_flag) {
+        print_func("\tYou must start %s with the -t option\n", progname);
+        print_func("\tto collect 3nd level domain stats.\n", progname);
+    } else {
+        Combo_report(SSC, "Source", "3LD");
+    }
+}
+
 
 void
 AgentAddr_free(AgentAddr ** headP)
@@ -1066,6 +1110,7 @@ ResetCounters(void)
     AgentAddr_free(&Destinations);
     StringCounter_free(&Tlds);
     StringCounter_free(&Slds);
+    StringCounter_free(&Nlds);
     StringAddrCounter_free(&SSC);
     memset(&last_ts, '\0', sizeof(last_ts));
 }
@@ -1080,6 +1125,7 @@ usage(void)
     fprintf(stderr, "\t-i addr\tIgnore this source IP address\n");
     fprintf(stderr, "\t-p\tDon't put interface in promiscuous mode\n");
     fprintf(stderr, "\t-s\tEnable 2nd level domain stats collection\n");
+    fprintf(stderr, "\t-t\tEnable 3nd level domain stats collection\n");
     fprintf(stderr, "\t-f\tfilter-name\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "Available filters:\n");
@@ -1117,13 +1163,16 @@ main(int argc, char *argv[])
     srandom(time(NULL));
     ResetCounters();
 
-    while ((x = getopt(argc, argv, "ab:f:i:ps")) != -1) {
+    while ((x = getopt(argc, argv, "ab:f:i:pst")) != -1) {
 	switch (x) {
 	case 'a':
 	    anon_flag = 1;
 	    break;
 	case 's':
 	    sld_flag = 1;
+	    break;
+	case 't':
+	    nld_flag = 1;
 	    break;
 	case 'p':
 	    promisc_flag = 0;
@@ -1236,6 +1285,7 @@ main(int argc, char *argv[])
 	Opcodes_report(); print_func("\n");
 	Tld_report(); print_func("\n");
 	Sld_report(); print_func("\n");
+	Nld_report(); print_func("\n");
 	SldBySource_report();
     }
 
