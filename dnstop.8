@@ -31,6 +31,8 @@ The options are as follows:
 anonymize addresses
 .It Fl b Ar expression
 BPF filter expression
+.br
+(default: udp dst port 53 and udp[10:2] & 0x8000 = 0)
 .It Fl i Ar address
 ignore select addresses
 .It Fl p
