@@ -1,0 +1,74 @@
+.\" $Id$
+.\" 
+.\" manpage written by jose@monkey.org
+.\"
+.Dd 24 December, 2002
+.Dt DNSTOP 8
+.Os
+.Sh NAME
+.Nm dnstop
+.Nd displays various tables of DNS traffic on your network
+.Sh SYNOPSIS
+.Nm
+.Op Fl aps
+.Op Fl b Ar expression
+.Op Fl i Ar address
+.Op Ar device
+.Op Ar savefile
+.Sh DESCRIPTION
+.Nm
+is a small tool to listen on
+.Ar device
+and collect and print statistics on the local network's DNS traffic. You
+must have read access to 
+.Pa /dev/bpf\&* .
+.Pp
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl a
+anonymize addresses
+.It Fl b Ar expression
+BPF filter expression
+.It Fl i ar address
+ignore select addresses
+.It Fl p
+Do not put the interface into promiscuous mode.
+.It Fl s
+collect second-level domain statistics
+.It Ar savefile
+a captured network trace in 
+.Cm pcap
+format
+.It Ar device
+ethernet device (ie fxp0)
+.El
+.Pp
+While running, the following options are available to alter the display:
+.Bl -tag -width Ds
+.It s
+display the source address table
+.It d 
+display the desitination address table
+.It t
+display the breakdown of query types seen
+.It 1
+show the TLD table
+.It 2
+show the SLD table
+.It ^R
+reset the counters
+.It ^X
+exit the program
+.It ?
+help
+.El
+.Pp 
+.Sh AUTHORS
+Duane Wessels 
+.Pq wessels@measurement-factory.com
+.Pp
+http://dnstop.measurement-factory.com/
+.Sh BUGS
+Unless compiled with
+.Tn -DUSE_PPP
+the program will not correctly decode PPP frames.
