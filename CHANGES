@@ -1,3 +1,23 @@
+2004/03/09 Duane Wessels
+
+    Added filter support.  Filters can be used to restrict the input
+    stream to queries with certain characteristics.  The currently
+    defined filters are:
+
+    unknown-tlds        Only includes queries for TLDs that are
+			bogus.  Useful for identifying hosts/servers
+			that leak queries for things like "localhost"
+			or "workgroup."
+
+    A-for-A             Only includes A queries for names that are
+			already IP addresses.  Certain Microsoft
+			Windows DNS servers have a known bug that
+			forward these queries.
+
+    rfc1918-ptr         PTR queries for addresses in RFC1918 space.
+			These should never leak from inside an
+			organization.
+
 2003/11/13 Mark Foster <mark@foster.cc>
 
     Added 'c' to display options. This screen will combine the
