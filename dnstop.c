@@ -131,10 +131,12 @@ AnonMap *Anons = NULL;
 #define T_SRV 33
 #endif
 #define C_MAX 65536
+#define OP_MAX 16
 
 int query_count_intvl = 0;
 int query_count_total = 0;
 int qtype_counts[T_MAX];
+int opcode_counts[OP_MAX];
 int qclass_counts[C_MAX];
 AgentAddr *Sources = NULL;
 AgentAddr *Destinations = NULL;
@@ -152,6 +154,7 @@ void SldBySource_report(void);
 void Sources_report(void);
 void Destinatioreport(void);
 void Qtypes_report(void);
+void Opcodes_report(void);
 void Tld_report(void);
 void Sld_report(void);
 void Help_report(void);
@@ -373,24 +376,15 @@ rfc1035NameUnpack(const char *buf, size_t sz, off_t * off, char *name, size_t ns
 }
 
 const char *
-QnameToTld(const char *qname)
-{
-    const char *t = strrchr(qname, '.');
-    if (NULL == t)
-	t = qname;
-    if (t > qname)
-	t++;
-    return t;
-}
-
-const char *
-QnameToSld(const char *qname)
+QnameToNld(const char *qname, int nld)
 {
     const char *t = strrchr(qname, '.');
     int dotcount = 1;
     if (NULL == t)
 	t = qname;
-    while (t > qname && dotcount < 2) {
+    if (0 == strcmp(t, ".arpa"))
+	dotcount--;
+    while (t > qname && dotcount < nld) {
 	t--;
 	if ('.' == *t)
 	    dotcount++;
@@ -468,13 +462,14 @@ handle_dns(const char *buf, int len, const struct in_addr sip, const struct in_a
     /* gather stats */
     qtype_counts[qtype]++;
     qclass_counts[qclass]++;
+    opcode_counts[qh.opcode]++;
 
-    s = QnameToTld(qname);
+    s = QnameToNld(qname, 1);
     sc = StringCounter_lookup_or_add(&Tlds, s);
     sc->count++;
 
     if (sld_flag) {
-	s = QnameToSld(qname);
+	s = QnameToNld(qname, 2);
 	sc = StringCounter_lookup_or_add(&Slds, s);
 	sc->count++;
 
@@ -661,6 +656,9 @@ keyboard(void)
     case 't':
 	SubReport = Qtypes_report;
 	break;
+    case 'o':
+	SubReport = Opcodes_report;
+	break;
     case 030:
 	Quit = 1;
 	break;
@@ -681,6 +679,7 @@ Help_report(void)
     printw(" s - Sources list\n");
     printw(" d - Destinations list\n");
     printw(" t - Query types\n");
+    printw(" o - Opcodes\n");
     printw(" 1 - TLD list\n");
     printw(" 2 - SLD list\n");
     printw(" c - SLD+Sources list\n");
@@ -739,6 +738,33 @@ qtype_str(int t)
 	break;
     default:
 	snprintf(buf, 30, "#%d?", t);
+	return buf;
+    }
+    /* NOTREACHED */
+}
+
+char *
+opcode_str(int o)
+{
+    static char buf[30];
+    switch (o) {
+    case 0:
+	return "Query";
+	break;
+    case 1:
+	return "Iquery";
+	break;
+    case 2:
+	return "Status";
+	break;
+    case 4:
+	return "Notify";
+	break;
+    case 5:
+	return "Update";
+	break;
+    default:
+	snprintf(buf, 30, "Opcode%d", o);
 	return buf;
     }
     /* NOTREACHED */
@@ -818,6 +844,25 @@ Qtypes_report(void)
 	    qtype_str(type),
 	    qtype_counts[type],
 	    100.0 * qtype_counts[type] / query_count_total);
+	if (0 == --nlines)
+	    break;
+    }
+}
+
+void
+Opcodes_report(void)
+{
+    int op;
+    int nlines = getmaxy(w) - 6;
+    printw("%-10s %9s %6s\n", "Opcode    ", "count", "%");
+    printw("%-10s %9s %6s\n", "----------", "---------", "------");
+    for (op = 0; op < OP_MAX; op++) {
+	if (0 == opcode_counts[op])
+	    continue;
+	printw("%-10s %9d %6.1f\n",
+	    opcode_str(op),
+	    opcode_counts[op],
+	    100.0 * opcode_counts[op] / query_count_total);
 	if (0 == --nlines)
 	    break;
     }
@@ -922,7 +967,7 @@ report(void)
 int
 UnknownTldFilter(unsigned short qt, unsigned short qc, const char *qn, const struct in_addr sip, const struct in_addr dip)
 {
-    const char *tld = QnameToTld(qn);
+    const char *tld = QnameToNld(qn, 1);
     unsigned int i;
     if (NULL == tld)
 	return 1;		/* tld is unknown */
@@ -1001,6 +1046,7 @@ ResetCounters(void)
     query_count_total = 0;
     memset(qtype_counts, '\0', sizeof(qtype_counts));
     memset(qclass_counts, '\0', sizeof(qclass_counts));
+    memset(opcode_counts, '\0', sizeof(opcode_counts));
     AgentAddr_free(&Sources);
     AgentAddr_free(&Destinations);
     StringCounter_free(&Tlds);
