@@ -1,3 +1,8 @@
+2005/01/13 Duane Wessels
+
+    Added a non-interactive mode.  If you specify a savefile and
+    stdout is not a TTY, dnstop prints each table at the end.
+
 2004/03/09 Duane Wessels
 
     Added filter support.  Filters can be used to restrict the input
