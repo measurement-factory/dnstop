@@ -30,6 +30,12 @@
 #define PCAP_SNAPLEN 1460
 #define MAX_QNAME_SZ 512
 
+#if USE_PPP
+#include <net/if_ppp.h>
+#define PPP_ADDRESS_VAL       0xff	/* The address byte value */
+#define PPP_CONTROL_VAL       0x03	/* The control byte value */
+#endif
+
 #ifdef __linux__
 #define uh_dport dest
 #endif
@@ -84,6 +90,7 @@ char *bpf_program_str = "udp dst port 53";
 WINDOW *w;
 static unsigned short port53;
 void (*SubReport) (void) = NULL;
+int (*handle_datalink) (const u_char * pkt, int len) = NULL;
 int Quit = 0;
 char *progname = NULL;
 int anon_flag = 0;
@@ -405,6 +412,49 @@ handle_ip(const struct ip *ip, int len)
     return 1;
 }
 
+#if USE_PPP
+int
+handle_ppp(const u_char * pkt, int len)
+{
+    char buf[PCAP_SNAPLEN];
+    unsigned short us;
+    unsigned short proto;
+    if (len < 2)
+	return 0;
+    if (*pkt == PPP_ADDRESS_VAL && *(pkt + 1) == PPP_CONTROL_VAL) {
+	pkt += 2;		/* ACFC not used */
+	len -= 2;
+    }
+    if (len < 2)
+	return 0;
+    if (*pkt % 2) {
+	proto = *pkt;		/* PFC is used */
+	pkt++;
+	len--;
+    } else {
+	memcpy(&us, pkt, sizeof(us));
+	proto = ntohs(us);
+	pkt += 2;
+	len -= 2;
+    }
+    if (ETHERTYPE_IP != proto && PPP_IP != proto)
+	return 0;
+    memcpy(buf, pkt, len);
+    return handle_ip((struct ip *) buf, len);
+}
+
+#endif
+
+int
+handle_null(const u_char * pkt, int len)
+{
+    unsigned int family;
+    memcpy(&family, pkt, sizeof(family));
+    if (AF_INET != family)
+	return 0;
+    return handle_ip((struct ip *) (pkt + 4), len - 4);
+}
+
 int
 handle_ether(const u_char * pkt, int len)
 {
@@ -421,7 +471,7 @@ handle_pcap(u_char * udata, const struct pcap_pkthdr *hdr, const u_char * pkt)
 {
     if (hdr->caplen < ETHER_HDR_LEN)
 	return;
-    if (0 == handle_ether(pkt, hdr->caplen))
+    if (0 == handle_datalink(pkt, hdr->caplen))
 	return;
     query_count_intvl++;
     query_count_total++;
@@ -777,6 +827,24 @@ main(int argc, char *argv[])
     if (x < 0) {
 	fprintf(stderr, "pcap_setfilter failed\n");
 	exit(1);
+    }
+    switch (pcap_datalink(pcap)) {
+    case DLT_EN10MB:
+	handle_datalink = handle_ether;
+	break;
+#if USE_PPP
+    case DLT_PPP:
+	handle_datalink = handle_ppp;
+	break;
+#endif
+    case DLT_NULL:
+	handle_datalink = handle_null;
+	break;
+    default:
+	fprintf(stderr, "unsupported data link type %d\n",
+	    pcap_datalink(pcap));
+	return 1;
+	break;
     }
     init_curses();
     while (0 == Quit) {
