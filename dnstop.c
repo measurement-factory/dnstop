@@ -444,7 +444,7 @@ keyboard(void)
     case 't':
 	SubReport = Qtypes_report;
 	break;
-    case 021:
+    case 031:
 	Quit = 1;
 	break;
     case 022:
@@ -467,7 +467,7 @@ Help_report(void)
     printw(" 1 - TLD list\n");
     printw(" 2 - SLD list\n");
     printw("^R - Reset counters\n");
-    printw("^Q - Quit\n");
+    printw("^X - Exit\n");
     printw("\n");
     printw("? - this\n");
 }
