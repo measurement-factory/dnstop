@@ -3,6 +3,9 @@ PROG=dnstop
 DATE != date +%Y%m%d
 CC=gcc
 
+SRCS=	$(PROG).c \
+	known_tlds.h
+
 # You may need to uncomment this, esp on Solaris
 XTRALIBS= # -lnsl -lresolv -lsocket
 
@@ -15,5 +18,8 @@ clean:
 	rm -f $(PROG) $(PROG).o $(PROG).core $(PROG).c~
 
 tar:
-	tar czvf $(PROG)-$(DATE).tar.gz LICENSE $(PROG).c dnstop.8 Makefile
+	mkdir $(PROG)-$(DATE)
+	cp -p LICENSE CHANGES $(SRCS) dnstop.8 Makefile $(PROG)-$(DATE)
+	tar czvf $(PROG)-$(DATE).tar.gz $(PROG)-$(DATE)
 	chmod 444 $(PROG)-$(DATE).tar.gz
+	rm -rf $(PROG)-$(DATE)
