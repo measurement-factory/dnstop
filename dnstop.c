@@ -17,7 +17,14 @@
 #include <assert.h>
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
+#ifdef __OpenBSD__
+#include <sys/socket.h>
+#include <net/if_arp.h>
+#include <net/if.h>
+#include <netinet/if_ether.h>
+#else
 #include <net/ethernet.h>
+#endif
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/udp.h>
@@ -100,7 +107,11 @@ AgentAddr *Sources = NULL;
 AgentAddr *Destinations = NULL;
 StringCounter *Tlds = NULL;
 StringCounter *Slds = NULL;
+#ifdef __OpenBSD__
+struct bpf_timeval last_ts;
+#else
 struct timeval last_ts;
+#endif
 
 void Sources_report(void);
 void Destinatioreport(void);
