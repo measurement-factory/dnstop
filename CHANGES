@@ -1,3 +1,11 @@
+2005/01/21 Sam Norris
+
+    Added support for third-level domain statistics.  Use the -t
+    command line option to enable collection of 3rd-level stats,
+    and use '3' while running to display them.  Note that enabling
+    3rd-level stats collection does not automatically also enable
+    2nd-level stats.
+
 2005/01/13 Duane Wessels
 
     Added a non-interactive mode.  If you specify a savefile and
