@@ -981,7 +981,7 @@ int
 AforAFilter(unsigned short qt, unsigned short qc, const char *qn, const struct in_addr sip, const struct in_addr dip)
 {
     struct in_addr a;
-    if (qt != T_PTR)
+    if (qt != T_A)
         return 0;  
     return inet_aton(qn, &a);
 }
