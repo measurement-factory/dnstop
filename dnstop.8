@@ -13,6 +13,7 @@
 .Op Fl aps
 .Op Fl b Ar expression
 .Op Fl i Ar address
+.Op Fl f Ar filter
 .Op Ar device
 .Op Ar savefile
 .Sh DESCRIPTION
@@ -24,6 +25,7 @@ or to parse the file
 and collect and print statistics on the local network's DNS traffic. You
 must have read access to 
 .Pa /dev/bpf\&* .
+.Sh COMMAND LINE OPTIONS
 .Pp
 The options are as follows:
 .Bl -tag -width Ds
@@ -39,6 +41,27 @@ ignore select addresses
 Do not put the interface into promiscuous mode.
 .It Fl s
 collect second-level domain statistics
+.\"
+.It Fl f
+input filter name
+.Pp
+The "unknown-tlds" filter 
+includes only queries for TLDs that are
+bogus.  Useful for identifying hosts/servers
+that leak queries for things like "localhost"
+or "workgroup."
+.Pp
+The "A-for-A" filter
+includes only A queries for names that are
+already IP addresses.  Certain Microsoft
+Windows DNS servers have a known bug that
+forward these queries.
+.Pp
+The "rfc1918-ptr" filter
+includes only PTR queries for addresses in RFC1918 space.
+These should never leak from inside an
+organization.
+.\"
 .It Ar savefile
 a captured network trace in 
 .Cm pcap
@@ -46,6 +69,7 @@ format
 .It Ar device
 ethernet device (ie fxp0)
 .El
+.Sh RUN TIME OPTIONS
 .Pp
 While running, the following options are available to alter the display:
 .Bl -tag -width Ds
@@ -70,10 +94,12 @@ help
 .El
 .Pp 
 .Sh AUTHORS
-Duane Wessels 
-.Pq wessels@measurement-factory.com
-.Pp
-http://dnstop.measurement-factory.com/
+.Bl -tag -width xx -compact
+.It Pa Duane Wessels (wessels@measurement-factory.com)
+.It Pa Mark Foster (mark@foster.cc)
+.It Pa Jose Nazario (jose@monkey.org)
+.It Pa http://dnstop.measurement-factory.com/
+.El
 .Sh BUGS
 Unless compiled with
 .Tn -DUSE_PPP
