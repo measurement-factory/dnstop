@@ -19,6 +19,8 @@
 .Nm
 is a small tool to listen on
 .Ar device
+or to parse the file
+.Ar savefile
 and collect and print statistics on the local network's DNS traffic. You
 must have read access to 
 .Pa /dev/bpf\&* .
@@ -29,7 +31,7 @@ The options are as follows:
 anonymize addresses
 .It Fl b Ar expression
 BPF filter expression
-.It Fl i ar address
+.It Fl i Ar address
 ignore select addresses
 .It Fl p
 Do not put the interface into promiscuous mode.
