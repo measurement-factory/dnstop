@@ -1,3 +1,10 @@
+2005/04/05 Duane Wssels
+
+    Mark Foster found a bug with the source+SLD list.  It was being
+    updated for 3RD-level domain names as well.  Mark also suggested
+    that the '@' key should display the source+SLD screen, just as
+    '3' and '#' work for 3RD-level.
+
 2005/01/21 Sam Norris
 
     Added support for third-level domain statistics.  Use the -t
