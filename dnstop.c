@@ -792,7 +792,7 @@ main(int argc, char *argv[])
 	    bpf_program_str = strdup(optarg);
 	    break;
 	case 'i':
-	    ignore_addr.s_addr = inet_addr(argv[2]);
+	    ignore_addr.s_addr = inet_addr(optarg);
 	    break;
 	default:
 	    usage();
