@@ -2,3 +2,6 @@ CFLAGS=-g -Wall
 
 dnsmon: dnsmon.o
 	$(CC) $(CFLAGS) -o $@ dnsmon.o -lpcap -lcurses
+
+clean:
+	rm -f dnsmon dnsmon.o dnsmon.core
