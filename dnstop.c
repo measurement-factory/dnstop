@@ -866,6 +866,11 @@ main(int argc, char *argv[])
 	handle_datalink = handle_ppp;
 	break;
 #endif
+#ifdef DLT_LOOP
+    case DLT_LOOP:
+	handle_datalink = handle_loop;
+	break;
+#endif
     case DLT_NULL:
 	handle_datalink = handle_null;
 	break;
