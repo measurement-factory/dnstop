@@ -41,6 +41,8 @@ ignore select addresses
 Do not put the interface into promiscuous mode.
 .It Fl s
 collect second-level domain statistics
+.It Fl t
+collect third-level domain statistics
 .\"
 .It Fl f
 input filter name
@@ -85,8 +87,12 @@ display the breakdown of opcodes seen
 show the TLD table
 .It 2
 show the SLD table
+.It 3
+show the 3LD table
 .It c
 show the SLD+source table
+.It #
+show the 3LD+source table
 .It ^R
 reset the counters
 .It ^X
