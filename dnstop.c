@@ -578,7 +578,12 @@ Tld_report(void)
 void
 Sld_report(void)
 {
-    StringCounter_report(Slds, "SLD");
+    if (0 == sld_flag) {
+	printw("\tYou must start %s with the -s option\n", progname);
+	printw("\tto collect 2nd level domain stats.\n", progname);
+    } else {
+	StringCounter_report(Slds, "SLD");
+    }
 }
 
 void
