@@ -15,5 +15,5 @@ clean:
 	rm -f $(PROG) $(PROG).o $(PROG).core $(PROG).c~
 
 tar:
-	tar czvf $(PROG)-$(DATE).tar.gz $(PROG).c Makefile
+	tar czvf $(PROG)-$(DATE).tar.gz LICENSE $(PROG).c Makefile
 	chmod 444 $(PROG)-$(DATE).tar.gz

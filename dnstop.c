@@ -1,4 +1,11 @@
-/* $Id$ */
+/*
+ * $Id$
+ *
+ * http://dnstop.measurement-factory.com/
+ *
+ * Copyright (c) 2002, The Measurement Factory, Inc.  All rights
+ * reserved.  See the LICENSE file for details.
+ */
 
 #include <sys/types.h>
 #include <sys/time.h>
