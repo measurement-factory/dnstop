@@ -411,13 +411,18 @@ handle_pcap(u_char * udata, const struct pcap_pkthdr *hdr, const u_char * pkt)
 }
 
 void
-cron(void)
+cron_pre(void)
 {
-    query_count_intvl = 0;
     AgentAddr_sort(&Sources);
     AgentAddr_sort(&Destinations);
     StringCounter_sort(&Tlds);
     StringCounter_sort(&Slds);
+}
+
+void
+cron_post(void)
+{
+    query_count_intvl = 0;
 }
 
 void
@@ -760,8 +765,9 @@ main(int argc, char *argv[])
 	    nodelay(w, 0);
 	}
 	keyboard();
-	cron();
+	cron_pre();
 	report();
+	cron_post();
     }
 
     pcap_close(pcap);
