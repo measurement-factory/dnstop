@@ -482,6 +482,7 @@ handle_loop(const u_char * pkt, int len)
 	return 0;
     return handle_ip((struct ip *) (pkt + 4), len - 4);
 }
+
 #endif
 
 #ifdef DLT_RAW
@@ -490,6 +491,7 @@ handle_raw(const u_char * pkt, int len)
 {
     return handle_ip((struct ip *) pkt, len);
 }
+
 #endif
 
 int
@@ -752,7 +754,7 @@ report(void)
 	query_count_intvl, query_count_total);
     clrtoeol();
     if (last_ts.tv_sec) {
-	time_t t = (time_t)last_ts.tv_sec;
+	time_t t = (time_t) last_ts.tv_sec;
 	move(0, 50);
 	printw("%s", ctime(&t));
     }
