@@ -87,6 +87,9 @@ int promisc_flag = 1;
 AnonMap *Anons = NULL;
 
 #define T_MAX 65536
+#ifndef T_A6
+#define T_A6 38
+#endif
 #define C_MAX 65536
 
 int query_count_intvl = 0;
@@ -525,7 +528,7 @@ qtype_str(int t)
     case T_SRV:
 	return "SRV?";
 	break;
-    case 38:
+    case T_A6:
 	return "A6?";
 	break;
     case T_ANY:
