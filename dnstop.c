@@ -78,6 +78,7 @@ void (*SubReport) (void) = NULL;
 int Quit = 0;
 char *progname = NULL;
 int anon_flag = 0;
+int sld_flag = 0;
 AnonMap *Anons = NULL;
 
 int query_count_intvl = 0;
@@ -87,12 +88,14 @@ int qclass_counts[ns_c_max];
 AgentAddr *Sources = NULL;
 AgentAddr *Destinations = NULL;
 StringCounter *Tlds = NULL;
+StringCounter *Slds = NULL;
 struct timeval last_ts;
 
 void Sources_report(void);
 void Destinations_report(void);
 void Qtypes_report(void);
 void Tld_report(void);
+void Sld_report(void);
 void Help_report(void);
 
 struct in_addr
@@ -316,15 +319,28 @@ handle_dns(const char *buf, int len)
     memcpy(&us, buf + offset + 2, 2);
     qclass = ntohs(us);
 
+    /* gather stats */
     qtype_counts[qtype]++;
     qclass_counts[qclass]++;
+
     t = strrchr(qname, '.');
     if (NULL == t)
-	return 0;
+	t = qname;
     if (t > qname)
 	t++;
     sc = StringCounter_lookup_or_add(&Tlds, t);
     sc->count++;
+
+    if (sld_flag) {
+	if (t > qname)
+	    t = strrchr(t-1, '.');
+	if (NULL == t)
+	    t = qname;
+	if (t > qname)
+	    t++;
+	sc = StringCounter_lookup_or_add(&Slds, t);
+	sc->count++;
+    }
 
     return 1;
 }
@@ -393,6 +409,7 @@ cron(void)
     AgentAddr_sort(&Sources);
     AgentAddr_sort(&Destinations);
     StringCounter_sort(&Tlds);
+    StringCounter_sort(&Slds);
 }
 
 void
@@ -410,8 +427,11 @@ keyboard(void)
     case 'd':
 	SubReport = Destinations_report;
 	break;
-    case 'n':
+    case '1':
 	SubReport = Tld_report;
+	break;
+    case '2':
+	SubReport = Sld_report;
 	break;
     case 't':
 	SubReport = Qtypes_report;
@@ -433,7 +453,8 @@ Help_report(void)
     printw("s - Sources list\n");
     printw("d - Destinations list\n");
     printw("t - Query types\n");
-    printw("n - TLD list\n");
+    printw("1 - TLD list\n");
+    printw("2 - SLD list\n");
     printw("q - Quit\n");
     printw("\n");
     printw("? - this\n");
@@ -515,6 +536,12 @@ void
 Tld_report(void)
 {
     StringCounter_report(Tlds, "TLD");
+}
+
+void
+Sld_report(void)
+{
+    StringCounter_report(Slds, "SLD");
 }
 
 void
@@ -619,10 +646,13 @@ main(int argc, char *argv[])
     memset(&last_ts, '\0', sizeof(last_ts));
     srandom(time(NULL));
 
-    while ((x = getopt(argc, argv, "ap:i:")) != -1) {
+    while ((x = getopt(argc, argv, "asp:i:")) != -1) {
 	switch (x) {
 	case 'a':
 	    anon_flag = 1;
+	    break;
+	case 's':
+	    sld_flag = 1;
 	    break;
 	case 'p':
 	    bpf_program_str = strdup(optarg);
