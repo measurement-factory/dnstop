@@ -123,6 +123,13 @@ int sld_flag = 0;
 int promisc_flag = 1;
 AnonMap *Anons = NULL;
 
+/*
+ * flags/features for non-interactive mode
+ */
+int interactive = 1;
+typedef int (printer)(const char *, ...);
+printer *print_func = (printer *) printw;
+
 #define T_MAX 65536
 #ifndef T_A6
 #define T_A6 38
@@ -633,7 +640,6 @@ void
 keyboard(void)
 {
     int ch;
-    /*move(getmaxy(w)-1, 0); */
     ch = getch() & 0xff;
     if (ch >= 'A' && ch <= 'Z')
 	ch += 'a' - 'A';
@@ -676,17 +682,17 @@ keyboard(void)
 void
 Help_report(void)
 {
-    printw(" s - Sources list\n");
-    printw(" d - Destinations list\n");
-    printw(" t - Query types\n");
-    printw(" o - Opcodes\n");
-    printw(" 1 - TLD list\n");
-    printw(" 2 - SLD list\n");
-    printw(" c - SLD+Sources list\n");
-    printw("^R - Reset counters\n");
-    printw("^X - Exit\n");
-    printw("\n");
-    printw("? - this\n");
+    print_func(" s - Sources list\n");
+    print_func(" d - Destinations list\n");
+    print_func(" t - Query types\n");
+    print_func(" o - Opcodes\n");
+    print_func(" 1 - TLD list\n");
+    print_func(" 2 - SLD list\n");
+    print_func(" c - SLD+Sources list\n");
+    print_func("^R - Reset counters\n");
+    print_func("^X - Exit\n");
+    print_func("\n");
+    print_func("? - this\n");
 }
 
 char *
@@ -770,16 +776,25 @@ opcode_str(int o)
     /* NOTREACHED */
 }
 
+int
+get_nlines(void)
+{
+	if (interactive)
+		return getmaxy(w) - 6;
+	else
+		return 50;
+}
+
 void
 StringCounter_report(StringCounter * list, char *what)
 {
     StringCounter *sc;
-    int nlines = getmaxy(w) - 6;
-    printw("%-20s %9s %6s\n", what, "count", "%");
-    printw("%-20s %9s %6s\n",
+    int nlines = get_nlines();
+    print_func("%-20s %9s %6s\n", what, "count", "%");
+    print_func("%-20s %9s %6s\n",
 	"--------------------", "---------", "------");
     for (sc = list; sc; sc = sc->next) {
-	printw("%-20.20s %9d %6.1f\n",
+	print_func("%-20.20s %9d %6.1f\n",
 	    sc->s,
 	    sc->count,
 	    100.0 * sc->count / query_count_total);
@@ -823,8 +838,8 @@ void
 Sld_report(void)
 {
     if (0 == sld_flag) {
-	printw("\tYou must start %s with the -s option\n", progname);
-	printw("\tto collect 2nd level domain stats.\n", progname);
+	print_func("\tYou must start %s with the -s option\n", progname);
+	print_func("\tto collect 2nd level domain stats.\n", progname);
     } else {
 	StringCounter_report(Slds, "SLD");
     }
@@ -834,13 +849,13 @@ void
 Qtypes_report(void)
 {
     int type;
-    int nlines = getmaxy(w) - 6;
-    printw("%-10s %9s %6s\n", "Query Type", "count", "%");
-    printw("%-10s %9s %6s\n", "----------", "---------", "------");
+    int nlines = get_nlines();
+    print_func("%-10s %9s %6s\n", "Query Type", "count", "%");
+    print_func("%-10s %9s %6s\n", "----------", "---------", "------");
     for (type = 0; type < T_MAX; type++) {
 	if (0 == qtype_counts[type])
 	    continue;
-	printw("%-10s %9d %6.1f\n",
+	print_func("%-10s %9d %6.1f\n",
 	    qtype_str(type),
 	    qtype_counts[type],
 	    100.0 * qtype_counts[type] / query_count_total);
@@ -853,13 +868,13 @@ void
 Opcodes_report(void)
 {
     int op;
-    int nlines = getmaxy(w) - 6;
-    printw("%-10s %9s %6s\n", "Opcode    ", "count", "%");
-    printw("%-10s %9s %6s\n", "----------", "---------", "------");
+    int nlines = get_nlines();
+    print_func("%-10s %9s %6s\n", "Opcode    ", "count", "%");
+    print_func("%-10s %9s %6s\n", "----------", "---------", "------");
     for (op = 0; op < OP_MAX; op++) {
 	if (0 == opcode_counts[op])
 	    continue;
-	printw("%-10s %9d %6.1f\n",
+	print_func("%-10s %9d %6.1f\n",
 	    opcode_str(op),
 	    opcode_counts[op],
 	    100.0 * opcode_counts[op] / query_count_total);
@@ -872,11 +887,11 @@ void
 AgentAddr_report(AgentAddr * list, const char *what)
 {
     AgentAddr *agent;
-    int nlines = getmaxy(w) - 6;
-    printw("%-16s %9s %6s\n", what, "count", "%");
-    printw("%-16s %9s %6s\n", "----------------", "---------", "------");
+    int nlines = get_nlines();
+    print_func("%-16s %9s %6s\n", what, "count", "%");
+    print_func("%-16s %9s %6s\n", "----------------", "---------", "------");
     for (agent = list; agent; agent = agent->next) {
-	printw("%-16s %9d %6.1f\n",
+	print_func("%-16s %9d %6.1f\n",
 	    anon_inet_ntoa(agent->src),
 	    agent->count,
 	    100.0 * agent->count / query_count_total);
@@ -889,12 +904,12 @@ void
 Combo_report(StringAddrCounter * list, char *what1, char *what2)
 {
     StringAddrCounter *ssc;
-    int nlines = getmaxy(w) - 6;
-    printw("%-16s %-32s %9s %6s\n", what1, what2, "count", "%");
-    printw("%-16s %-32s %9s %6s\n",
+    int nlines = get_nlines();
+    print_func("%-16s %-32s %9s %6s\n", what1, what2, "count", "%");
+    print_func("%-16s %-32s %9s %6s\n",
 	"----------------", "--------------------", "---------", "------");
     for (ssc = list; ssc; ssc = ssc->next) {
-	printw("%-16s %-32s %9d %6.1f\n",
+	print_func("%-16s %-32s %9d %6.1f\n",
 	    anon_inet_ntoa(ssc->src),
 	    ssc->str,
 	    ssc->count,
@@ -908,8 +923,8 @@ void
 SldBySource_report(void)
 {
     if (0 == sld_flag) {
-	printw("\tYou must start %s with the -s option\n", progname);
-	printw("\tto collect 2nd level domain stats.\n", progname);
+	print_func("\tYou must start %s with the -s option\n", progname);
+	print_func("\tto collect 2nd level domain stats.\n", progname);
     } else {
 	Combo_report(SSC, "Source", "SLD");
     }
@@ -943,13 +958,13 @@ void
 report(void)
 {
     move(0, 0);
-    printw("%d new queries, %d total queries",
+    print_func("%d new queries, %d total queries",
 	query_count_intvl, query_count_total);
     clrtoeol();
     if (last_ts.tv_sec) {
 	time_t t = (time_t) last_ts.tv_sec;
 	move(0, 50);
-	printw("%s", ctime(&t));
+	print_func("%s", ctime(&t));
     }
     move(2, 0);
     clrtobot();
@@ -1145,6 +1160,16 @@ main(int argc, char *argv[])
 	fprintf(stderr, "pcap_open_*: %s\n", errbuf);
 	exit(1);
     }
+
+    if (0 == isatty(1)) {
+	if (0 == readfile_state) {
+	    fprintf(stderr, "Non-interactive mode requires savefile argument\n");
+	    exit(1);
+	}
+	interactive = 0;
+	print_func = printf;
+    }
+
     memset(&fp, '\0', sizeof(fp));
     x = pcap_compile(pcap, &fp, bpf_program_str, 1, 0);
     if (x < 0) {
@@ -1184,22 +1209,35 @@ main(int argc, char *argv[])
 	return 1;
 	break;
     }
-    init_curses();
-    while (0 == Quit) {
-	if (readfile_state < 2)
-	    if (readfile_state || pcap_select(pcap, 1, 0))
-		x = pcap_dispatch(pcap, 50, handle_pcap, NULL);
-	if (0 == x && 1 == readfile_state) {
-	    /* block on keyboard until user quits */
-	    readfile_state++;
-	    nodelay(w, 0);
+    if (interactive) {
+	init_curses();
+	while (0 == Quit) {
+	    if (readfile_state < 2)
+		if (readfile_state || pcap_select(pcap, 1, 0))
+		    x = pcap_dispatch(pcap, 50, handle_pcap, NULL);
+	    if (0 == x && 1 == readfile_state) {
+		/* block on keyboard until user quits */
+		readfile_state++;
+		nodelay(w, 0);
+	    }
+	    keyboard();
+	    cron_pre();
+	    report();
+	    cron_post();
 	}
-	keyboard();
+	endwin();		/* klin, Thu Nov 28 08:56:51 2002 */
+    } else {
+	while (pcap_dispatch(pcap, 50, handle_pcap, NULL))
+		(void) 0;
 	cron_pre();
-	report();
-	cron_post();
+	Sources_report(); print_func("\n");
+	Destinatioreport(); print_func("\n");
+	Qtypes_report(); print_func("\n");
+	Opcodes_report(); print_func("\n");
+	Tld_report(); print_func("\n");
+	Sld_report(); print_func("\n");
+	SldBySource_report();
     }
-    endwin();			/* klin, Thu Nov 28 08:56:51 2002 */
 
     pcap_close(pcap);
     return 0;

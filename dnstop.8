@@ -95,6 +95,14 @@ exit the program
 help
 .El
 .Pp 
+.Sh NON-INTERACTIVE MODE
+If stdout is not a tty,
+.Nm
+runs in non-interactive mode.  In this case, you must
+supply a savefile for reading, instead of capturing
+live packets.  After reading the entire savefile,
+.Nm
+prints the top 50 entries for each table.
 .Sh AUTHORS
 .Bl -tag -width xx -compact
 .It Pa Duane Wessels (wessels@measurement-factory.com)
