@@ -1,5 +1,6 @@
 CFLAGS=-g -Wall
 PROG=dnstop
+DATE != date +%Y%m%d
 CC=gcc
 
 # You may need to uncomment this, esp on Solaris
@@ -12,3 +13,7 @@ $(PROG): $(PROG).o
 
 clean:
 	rm -f $(PROG) $(PROG).o $(PROG).core $(PROG).c~
+
+tar:
+	tar czvf $(PROG)-$(DATE).tar.gz $(PROG).c Makefile
+	chmod 444 $(PROG)-$(DATE).tar.gz
