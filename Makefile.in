@@ -1,6 +1,8 @@
 CFLAGS=-g -Wall
 PROG=dnstop
 
+all: $(PROG)
+
 $(PROG): $(PROG).o
 	$(CC) $(CFLAGS) -o $@ $(PROG).o -lpcap -lcurses
 
