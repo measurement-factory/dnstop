@@ -332,11 +332,13 @@ handle_dns(const char *buf, int len)
     sc->count++;
 
     if (sld_flag) {
-	if (t > qname)
-	    t = strrchr(t-1, '.');
-	if (NULL == t)
-	    t = qname;
-	if (t > qname)
+	int dotcount = 0;
+	while (t > qname && dotcount < 2) {
+		t--;
+		if ('.' == *t)
+			dotcount++;
+	}
+        if (t > qname)
 	    t++;
 	sc = StringCounter_lookup_or_add(&Slds, t);
 	sc->count++;
