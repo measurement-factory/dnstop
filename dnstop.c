@@ -79,6 +79,7 @@ int Quit = 0;
 char *progname = NULL;
 int anon_flag = 0;
 int sld_flag = 0;
+int promisc_flag = 1;
 AnonMap *Anons = NULL;
 
 int query_count_intvl = 0;
@@ -672,11 +673,13 @@ ResetCounters(void)
 void
 usage(void)
 {
-    fprintf(stderr, "usage: %s [-a] [-i addr] [-p expr] netdevice|savefile\n",
+    fprintf(stderr, "usage: %s [opts] netdevice|savefile\n",
 	progname);
     fprintf(stderr, "\t-a\tAnonymize IP Addrs\n");
+    fprintf(stderr, "\t-b expr\tBPF program code\n");
     fprintf(stderr, "\t-i addr\tIgnore this source IP address\n");
-    fprintf(stderr, "\t-p expr\tBPF program code\n");
+    fprintf(stderr, "\t-p\tDon't put interface in promiscuous mode\n");
+    fprintf(stderr, "\t-s\tEnable 2nd level domain stats collection\n");
     exit(1);
 }
 
@@ -696,7 +699,7 @@ main(int argc, char *argv[])
     srandom(time(NULL));
     ResetCounters();
 
-    while ((x = getopt(argc, argv, "asp:i:")) != -1) {
+    while ((x = getopt(argc, argv, "ab:i:ps")) != -1) {
 	switch (x) {
 	case 'a':
 	    anon_flag = 1;
@@ -705,6 +708,9 @@ main(int argc, char *argv[])
 	    sld_flag = 1;
 	    break;
 	case 'p':
+	    promisc_flag = 0;
+	    break;
+	case 'b':
 	    bpf_program_str = strdup(optarg);
 	    break;
 	case 'i':
@@ -727,7 +733,7 @@ main(int argc, char *argv[])
     if (readfile_state) {
 	pcap = pcap_open_offline(device, errbuf);
     } else {
-	pcap = pcap_open_live(device, PCAP_SNAPLEN, 1, 1000, errbuf);
+	pcap = pcap_open_live(device, PCAP_SNAPLEN, promisc_flag, 1000, errbuf);
     }
     if (NULL == pcap) {
 	fprintf(stderr, "pcap_open_*: %s\n", errbuf);
