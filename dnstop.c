@@ -152,6 +152,10 @@ foo_cmp(const void *A, const void *B)
 	return 1;
     if (a->cnt > b->cnt)
 	return -1;
+    if (a < b)
+	return 1;
+    if (a > b)
+	return -1;
     return 0;
 }
 
