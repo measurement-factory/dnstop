@@ -1,5 +1,6 @@
 CFLAGS=-g -Wall
 PROG=dnstop
+CC=gcc
 
 all: $(PROG)
 

@@ -25,6 +25,10 @@
 #define PCAP_SNAPLEN 1460
 #define MAX_QNAME_SZ 512
 
+#ifdef __linux__
+#define uh_dport dest
+#endif
+
 typedef struct _AgentAddr AgentAddr;
 struct _AgentAddr {
     struct in_addr src;
@@ -82,10 +86,13 @@ int sld_flag = 0;
 int promisc_flag = 1;
 AnonMap *Anons = NULL;
 
+#define T_MAX 65536
+#define C_MAX 65536
+
 int query_count_intvl = 0;
 int query_count_total = 0;
-int qtype_counts[ns_t_max];
-int qclass_counts[ns_c_max];
+int qtype_counts[T_MAX];
+int qclass_counts[C_MAX];
 AgentAddr *Sources = NULL;
 AgentAddr *Destinations = NULL;
 StringCounter *Tlds = NULL;
@@ -93,7 +100,7 @@ StringCounter *Slds = NULL;
 struct timeval last_ts;
 
 void Sources_report(void);
-void Destinations_report(void);
+void Destinatioreport(void);
 void Qtypes_report(void);
 void Tld_report(void);
 void Sld_report(void);
@@ -438,7 +445,7 @@ keyboard(void)
 	SubReport = Sources_report;
 	break;
     case 'd':
-	SubReport = Destinations_report;
+	SubReport = Destinatioreport;
 	break;
     case '1':
 	SubReport = Tld_report;
@@ -482,46 +489,46 @@ qtype_str(int t)
 {
     static char buf[30];
     switch (t) {
-    case ns_t_a:
+    case T_A:
 	return "A?";
 	break;
-    case ns_t_ns:
+    case T_NS:
 	return "NS?";
 	break;
-    case ns_t_cname:
+    case T_CNAME:
 	return "CNAME?";
 	break;
-    case ns_t_soa:
+    case T_SOA:
 	return "SOA?";
 	break;
-    case ns_t_ptr:
+    case T_PTR:
 	return "PTR?";
 	break;
-    case ns_t_mx:
+    case T_MX:
 	return "MX?";
 	break;
-    case ns_t_txt:
+    case T_TXT:
 	return "TXT?";
 	break;
-    case ns_t_sig:
+    case T_SIG:
 	return "SIG?";
 	break;
-    case ns_t_key:
+    case T_KEY:
 	return "KEY?";
 	break;
-    case ns_t_aaaa:
+    case T_AAAA:
 	return "AAAA?";
 	break;
-    case ns_t_loc:
+    case T_LOC:
 	return "LOC?";
 	break;
-    case ns_t_srv:
+    case T_SRV:
 	return "SRV?";
 	break;
     case 38:
 	return "A6?";
 	break;
-    case ns_t_any:
+    case T_ANY:
 	return "ANY?";
 	break;
     default:
@@ -581,7 +588,7 @@ Qtypes_report(void)
     int nlines = w->_maxy - 6;
     printw("%-10s %9s %6s\n", "Query Type", "count", "%");
     printw("%-10s %9s %6s\n", "----------", "---------", "------");
-    for (type = 0; type < ns_t_max; type++) {
+    for (type = 0; type < T_MAX; type++) {
 	if (0 == qtype_counts[type])
 	    continue;
 	printw("%-10s %9d %6.1f\n",
@@ -629,7 +636,7 @@ Sources_report(void)
 }
 
 void
-Destinations_report(void)
+Destinatioreport(void)
 {
     AgentAddr_report(Destinations, "Destinations");
 }
@@ -745,7 +752,7 @@ main(int argc, char *argv[])
 	exit(1);
     }
     memset(&fp, '\0', sizeof(fp));
-    x = pcap_compile(pcap, &fp, bpf_program_str, 1, NULL);
+    x = pcap_compile(pcap, &fp, bpf_program_str, 1, 0);
     if (x < 0) {
 	fprintf(stderr, "pcap_compile failed\n");
 	exit(1);
