@@ -359,16 +359,15 @@ handle_dns(const char *buf, int len)
     if (sld_flag) {
 	int dotcount = 0;
 	while (t > qname && dotcount < 2) {
-		t--;
-		if ('.' == *t)
-			dotcount++;
+	    t--;
+	    if ('.' == *t)
+		dotcount++;
 	}
-        if (t > qname)
+	if (t > qname)
 	    t++;
 	sc = StringCounter_lookup_or_add(&Slds, t);
 	sc->count++;
     }
-
     return 1;
 }
 
@@ -569,11 +568,11 @@ StringCounter_report(StringCounter * list, char *what)
 }
 
 void
-StringCounter_free(StringCounter **headP)
+StringCounter_free(StringCounter ** headP)
 {
     StringCounter *sc;
     void *next;
-    for(sc=*headP; sc; sc=next) {
+    for (sc = *headP; sc; sc = next) {
 	next = sc->next;
 	free(sc->s);
 	free(sc);
@@ -635,11 +634,11 @@ AgentAddr_report(AgentAddr * list, const char *what)
 }
 
 void
-AgentAddr_free(AgentAddr **headP)
+AgentAddr_free(AgentAddr ** headP)
 {
     AgentAddr *aa;
     void *next;
-    for(aa=*headP; aa; aa=next) {
+    for (aa = *headP; aa; aa = next) {
 	next = aa->next;
 	free(aa);
     }
@@ -658,7 +657,7 @@ Destinatioreport(void)
     AgentAddr_report(Destinations, "Destinations");
 }
 
-void 
+void
 report(void)
 {
     move(0, 0);
@@ -676,7 +675,7 @@ report(void)
     refresh();
 }
 
-void 
+void
 init_curses(void)
 {
     w = initscr();
