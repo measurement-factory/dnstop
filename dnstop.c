@@ -936,6 +936,8 @@ int
 AforAFilter(unsigned short qt, unsigned short qc, const char *qn, const struct in_addr sip, const struct in_addr dip)
 {
     struct in_addr a;
+    if (qt != T_PTR)
+        return 0;  
     return inet_aton(qn, &a);
 }
 
@@ -971,9 +973,9 @@ set_filter(const char *fn)
 {
 	if (0 == strcmp(fn, "unknown-tlds"))
 		Filter = UnknownTldFilter;
-	if (0 == strcmp(fn, "A-for-A"))
+	else if (0 == strcmp(fn, "A-for-A"))
 		Filter = AforAFilter;
-	if (0 == strcmp(fn, "rfc1918-ptr"))
+	else if (0 == strcmp(fn, "rfc1918-ptr"))
 		Filter = RFC1918PtrFilter;
 	else
 		Filter = NULL;
