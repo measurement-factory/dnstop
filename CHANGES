@@ -1,0 +1,8 @@
+7/31/2003 Mark Foster <mark@foster.cc>
+
+    Added '3' to display options. This screen will combine the
+    source and sld fields to show "who is querying for what" -
+    reason: we see alot of duplicate querys for whatever reason.
+    This will help separate the legitimate queries from the broken
+    resolvers, etc. See http://www.circleid.com/article/102_0_1_0_C/
+    for more about that.
