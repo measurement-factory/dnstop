@@ -8,4 +8,4 @@ $(PROG): $(PROG).o
 	$(CC) $(CFLAGS) -o $@ $(PROG).o -lpcap -lcurses
 
 clean:
-	rm -f $(PROG) $(PROG).o $(PROG).core
+	rm -f $(PROG) $(PROG).o $(PROG).core $(PROG).c~
