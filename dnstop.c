@@ -597,10 +597,9 @@ usage(void)
 {
     fprintf(stderr, "usage: %s [-a] [-i addr] [-p expr] netdevice|savefile\n",
 	progname);
-    fprintf(stderr, "opts:\n";
-    fprintf(stderr, "\t-a\tAnonymize IP Addrs\n";
-    fprintf(stderr, "\t-i addr\tIgnore this source IP address\n";
-    fprintf(stderr, "\t-p expr\tBPF program code\n";
+    fprintf(stderr, "\t-a\tAnonymize IP Addrs\n");
+    fprintf(stderr, "\t-i addr\tIgnore this source IP address\n");
+    fprintf(stderr, "\t-p expr\tBPF program code\n");
     exit(1);
 }
 
