@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 #include <ctype.h>
 #include <curses.h>
 #include <assert.h>
