@@ -17,7 +17,7 @@
 #include <assert.h>
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
-#ifdef __OpenBSD__
+#if defined(__OpenBSD__) || defined(__NetBSD__)
 #include <sys/socket.h>
 #include <net/if_arp.h>
 #include <net/if.h>
@@ -83,7 +83,7 @@ char *device = NULL;
 struct in_addr ignore_addr;
 pcap_t *pcap = NULL;
 char *bpf_program_str = "udp dst port 53";
-WINDOW *w = NULL;
+WINDOW *w;
 static unsigned short port53;
 void (*SubReport) (void) = NULL;
 int Quit = 0;
@@ -450,7 +450,7 @@ void
 keyboard(void)
 {
     int ch;
-    /*move(w->_maxy-1, 0); */
+    /*move(getmaxy(w)-1, 0); */
     ch = getch() & 0xff;
     if (ch >= 'A' && ch <= 'Z')
 	ch += 'a' - 'A';
@@ -556,7 +556,7 @@ void
 StringCounter_report(StringCounter * list, char *what)
 {
     StringCounter *sc;
-    int nlines = w->_maxy - 6;
+    int nlines = getmaxy(w) - 6;
     printw("%-20s %9s %6s\n", what, "count", "%");
     printw("%-20s %9s %6s\n",
 	"--------------------", "---------", "------");
@@ -604,7 +604,7 @@ void
 Qtypes_report(void)
 {
     int type;
-    int nlines = w->_maxy - 6;
+    int nlines = getmaxy(w) - 6;
     printw("%-10s %9s %6s\n", "Query Type", "count", "%");
     printw("%-10s %9s %6s\n", "----------", "---------", "------");
     for (type = 0; type < T_MAX; type++) {
@@ -623,7 +623,7 @@ void
 AgentAddr_report(AgentAddr * list, const char *what)
 {
     AgentAddr *agent;
-    int nlines = w->_maxy - 6;
+    int nlines = getmaxy(w) - 6;
     printw("%-16s %9s %6s\n", what, "count", "%");
     printw("%-16s %9s %6s\n", "----------------", "---------", "------");
     for (agent = list; agent; agent = agent->next) {
