@@ -444,7 +444,7 @@ keyboard(void)
     case 't':
 	SubReport = Qtypes_report;
 	break;
-    case 031:
+    case 030:
 	Quit = 1;
 	break;
     case 022:
