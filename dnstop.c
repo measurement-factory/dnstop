@@ -152,6 +152,10 @@ foo_cmp(const void *A, const void *B)
 	return 1;
     if (a->cnt > b->cnt)
 	return -1;
+    if (a->ptr < b->ptr)
+	return 1;
+    if (a->ptr > b->ptr)
+	return -1;
     return 0;
 }
 
@@ -706,8 +710,8 @@ main(int argc, char *argv[])
 	    nodelay(w, 0);
 	}
 	keyboard();
-	report();
 	cron();
+	report();
     }
 
     pcap_close(pcap);
