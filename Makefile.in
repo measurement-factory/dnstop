@@ -1,7 +1,8 @@
 CFLAGS=-g -Wall
+PROG=dnstop
 
-dnsmon: dnsmon.o
-	$(CC) $(CFLAGS) -o $@ dnsmon.o -lpcap -lcurses
+$(PROG): $(PROG).o
+	$(CC) $(CFLAGS) -o $@ $(PROG).o -lpcap -lcurses
 
 clean:
-	rm -f dnsmon dnsmon.o dnsmon.core
+	rm -f $(PROG) $(PROG).o $(PROG).core
