@@ -791,6 +791,18 @@ usage(void)
 }
 
 int
+pcap_select(pcap_t * p, int sec, int usec)
+{
+    fd_set R;
+    struct timeval to;
+    FD_ZERO(&R);
+    FD_SET(pcap_fileno(p), &R);
+    to.tv_sec = sec;
+    to.tv_usec = usec;
+    return select(pcap_fileno(p) + 1, &R, NULL, NULL, &to);
+}
+
+int
 main(int argc, char *argv[])
 {
     char errbuf[PCAP_ERRBUF_SIZE];
@@ -883,7 +895,8 @@ main(int argc, char *argv[])
     init_curses();
     while (0 == Quit) {
 	if (readfile_state < 2)
-	    x = pcap_dispatch(pcap, 100, handle_pcap, NULL);
+	    if (readfile_state || pcap_select(pcap, 1, 0))
+		x = pcap_dispatch(pcap, 50, handle_pcap, NULL);
 	if (0 == x && 1 == readfile_state) {
 	    /* block on keyboard until user quits */
 	    readfile_state++;
