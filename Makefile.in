@@ -1,0 +1,4 @@
+CFLAGS=-g -Wall
+
+dnsmon: dnsmon.o
+	$(CC) $(CFLAGS) -o $@ dnsmon.o -lpcap -lcurses
