@@ -17,14 +17,12 @@
 #include <assert.h>
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
-#if defined(__OpenBSD__) || defined(__NetBSD__)
+
 #include <sys/socket.h>
 #include <net/if_arp.h>
 #include <net/if.h>
 #include <netinet/if_ether.h>
-#else
-#include <net/ethernet.h>
-#endif
+
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/udp.h>
