@@ -868,6 +868,7 @@ main(int argc, char *argv[])
 	report();
 	cron_post();
     }
+    endwin();   /* klin, Thu Nov 28 08:56:51 2002 */
 
     pcap_close(pcap);
     return 0;
