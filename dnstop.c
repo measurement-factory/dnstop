@@ -481,7 +481,14 @@ handle_loop(const u_char * pkt, int len)
 	return 0;
     return handle_ip((struct ip *) (pkt + 4), len - 4);
 }
+#endif
 
+#ifdef DLT_RAW
+int
+handle_raw(const u_char * pkt, int len)
+{
+    return handle_ip((struct ip *) pkt, len);
+}
 #endif
 
 int
@@ -881,6 +888,11 @@ main(int argc, char *argv[])
 #ifdef DLT_LOOP
     case DLT_LOOP:
 	handle_datalink = handle_loop;
+	break;
+#endif
+#ifdef DLT_RAW
+    case DLT_RAW:
+	handle_datalink = handle_raw;
 	break;
 #endif
     case DLT_NULL:
