@@ -99,7 +99,7 @@ struct _AnonMap {
 char *device = NULL;
 struct in_addr ignore_addr;
 pcap_t *pcap = NULL;
-char *bpf_program_str = "udp dst port 53";
+char *bpf_program_str = "udp dst port 53 and udp[10:2] & 0x8000 = 0";
 WINDOW *w;
 static unsigned short port53;
 void (*SubReport) (void) = NULL;
@@ -751,8 +751,9 @@ report(void)
 	query_count_intvl, query_count_total);
     clrtoeol();
     if (last_ts.tv_sec) {
+	time_t t = (time_t)last_ts.tv_sec;
 	move(0, 50);
-	printw("%s", ctime(&last_ts.tv_sec));
+	printw("%s", ctime(&t));
     }
     move(2, 0);
     clrtobot();
