@@ -471,6 +471,19 @@ handle_null(const u_char * pkt, int len)
     return handle_ip((struct ip *) (pkt + 4), len - 4);
 }
 
+#ifdef DLT_LOOP
+int
+handle_loop(const u_char * pkt, int len)
+{
+    unsigned int family;
+    memcpy(&family, pkt, sizeof(family));
+    if (AF_INET != ntohl(family))
+	return 0;
+    return handle_ip((struct ip *) (pkt + 4), len - 4);
+}
+
+#endif
+
 int
 handle_ether(const u_char * pkt, int len)
 {
@@ -876,7 +889,7 @@ main(int argc, char *argv[])
 	report();
 	cron_post();
     }
-    endwin();   /* klin, Thu Nov 28 08:56:51 2002 */
+    endwin();			/* klin, Thu Nov 28 08:56:51 2002 */
 
     pcap_close(pcap);
     return 0;
