@@ -3,6 +3,7 @@ static const char *KnownTLDS[] = {
 	"com",
 	"net",
 	"arpa",
+	"in-addr.arpa",	/* because dnstop treats in-addr.arpa as a TLD */
 	"org",
 	"edu",
 	"aero",
