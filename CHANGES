@@ -1,4 +1,9 @@
-2005/04/05 Duane Wssels
+2006/04/24 Duane Wessels
+	
+    Adriaan Peeters reported that the list of known TLDs is
+    out-of-date.  In particular, the .EU domain is not in the list.
+	
+2005/04/05 Duane Wessels
 
     Mark Foster found a bug with the source+SLD list.  It was being
     updated for 3RD-level domain names as well.  Mark also suggested
