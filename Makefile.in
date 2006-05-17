@@ -12,7 +12,7 @@ XTRALIBS= # -lnsl -lresolv -lsocket
 all: $(PROG)
 
 $(PROG): $(PROG).o
-	$(CC) $(CFLAGS) -o $@ $(PROG).o -lpcap -lcurses $(XTRALIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(PROG).o -lpcap -lcurses $(XTRALIBS)
 
 clean:
 	rm -f $(PROG) $(PROG).o $(PROG).core $(PROG).c~
