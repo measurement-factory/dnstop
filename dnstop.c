@@ -494,13 +494,13 @@ handle_dns(const char *buf, int len, const struct in_addr sip, const struct in_a
 
     }
     if (nld_flag) {
-        s = QnameToNld(qname, 3);
-        sc = StringCounter_lookup_or_add(&Nlds, s);
-        sc->count++;
+	s = QnameToNld(qname, 3);
+	sc = StringCounter_lookup_or_add(&Nlds, s);
+	sc->count++;
 
-        /* increment StringAddrCounter */
-        ssc = StringAddrCounter_lookup_or_add(&SSC3, sip, s);
-        ssc->count++;
+	/* increment StringAddrCounter */
+	ssc = StringAddrCounter_lookup_or_add(&SSC3, sip, s);
+	ssc->count++;
 
     }
     return 1;
@@ -612,13 +612,13 @@ handle_ether(const u_char * pkt, int len)
     struct ether_header *e = (void *) pkt;
     unsigned short etype = ntohs(e->ether_type);
     if (len < ETHER_HDR_LEN)
-        return 0;
+	return 0;
     pkt += ETHER_HDR_LEN;
     len -= ETHER_HDR_LEN;
     if (ETHERTYPE_8021Q == etype) {
-        etype = ntohs(*(unsigned short *) (pkt + 2));
-        pkt += 4;
-        len -= 4;
+	etype = ntohs(*(unsigned short *) (pkt + 2));
+	pkt += 4;
+	len -= 4;
     }
     if (ETHERTYPE_IP != etype)
 	return 0;
@@ -877,10 +877,10 @@ void
 Nld_report(void)
 {
     if (0 == nld_flag) {
-        print_func("\tYou must start %s with the -t option\n", progname);
-        print_func("\tto collect 3nd level domain stats.\n", progname);
+	print_func("\tYou must start %s with the -t option\n", progname);
+	print_func("\tto collect 3nd level domain stats.\n", progname);
     } else {
-        StringCounter_report(Nlds, "3LD");
+	StringCounter_report(Nlds, "3LD");
     }
 }
 
@@ -973,10 +973,10 @@ void
 NldBySource_report(void)
 {
     if (0 == nld_flag) {
-        print_func("\tYou must start %s with the -t option\n", progname);
-        print_func("\tto collect 3nd level domain stats.\n", progname);
+	print_func("\tYou must start %s with the -t option\n", progname);
+	print_func("\tto collect 3nd level domain stats.\n", progname);
     } else {
-        Combo_report(SSC3, "Source", "3LD");
+	Combo_report(SSC3, "Source", "3LD");
     }
 }
 
@@ -1048,7 +1048,7 @@ AforAFilter(unsigned short qt, unsigned short qc, const char *qn, const struct i
 {
     struct in_addr a;
     if (qt != T_A)
-        return 0;  
+	return 0;  
     return inet_aton(qn, &a);
 }
 
@@ -1059,23 +1059,23 @@ RFC1918PtrFilter(unsigned short qt, unsigned short qc, const char *qn, const str
     char q[128];   
     unsigned int i = 0;
     if (qt != T_PTR)
-        return 0;  
+	return 0;  
     strncpy(q, qn, sizeof(q)-1);
     q[sizeof(q)-1] = '\0';
     t = strstr(q, ".in-addr.arpa");
     if (NULL == t)
-        return 0;
+	return 0;
     *t = '\0';
     for (t = strtok(q, "."); t; t = strtok(NULL, ".")) {
-        i >>= 8;
-        i |= ((atoi(t) & 0xff) << 24);
+	i >>= 8;
+	i |= ((atoi(t) & 0xff) << 24);
     }
     if ((i & 0xff000000) == 0x0a000000)
-        return 1;
+	return 1;
     if ((i & 0xfff00000) == 0xac100000)
-        return 1;
+	return 1;
     if ((i & 0xffff0000) == 0xc0a80000)
-        return 1;
+	return 1;
     return 0;
 }
 
