@@ -1,3 +1,17 @@
+2006/05/17 Max Horn
+
+    A few fixes for OS X.
+
+    1) select()ing on a pcap FD doesn't always work.  Advice from
+       tcpdump mailing list archive is to put it into non-blocking
+       mode and ignore the select() return value.
+
+    2) Added $(LDFLAGS) to link command line in Makefile to have
+       dnstop linked with specific libraries.  LDFLAGS will be
+       picked up from the environment.
+
+    3) OS X needs to #include <arpa/nameser_compat.h>
+
 2006/04/24 Duane Wessels
 	
     Adriaan Peeters reported that the list of known TLDs is
