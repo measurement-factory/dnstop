@@ -25,6 +25,9 @@
 #include <assert.h>
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
+#ifdef __APPLE__
+#include <arpa/nameser_compat.h>
+#endif
 
 #include <sys/socket.h>
 #include <net/if_arp.h>
