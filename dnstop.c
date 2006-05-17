@@ -1238,6 +1238,17 @@ main(int argc, char *argv[])
 	fprintf(stderr, "pcap_setfilter failed\n");
 	exit(1);
     }
+
+    /*
+     * non-blocking call added for Mac OS X bugfix.  Sent by Max Horn.
+     * ref http://www.tcpdump.org/lists/workers/2002/09/msg00033.html
+     */
+    x = pcap_setnonblock(pcap, 1, errbuf);
+    if (x < 0) {
+	fprintf(stderr, "pcap_setnonblock failed: %s\n", errbuf);
+	exit(1);
+    }
+
     switch (pcap_datalink(pcap)) {
     case DLT_EN10MB:
 	handle_datalink = handle_ether;
@@ -1269,9 +1280,17 @@ main(int argc, char *argv[])
     if (interactive) {
 	init_curses();
 	while (0 == Quit) {
-	    if (readfile_state < 2)
-		if (readfile_state || pcap_select(pcap, 1, 0))
-		    x = pcap_dispatch(pcap, 50, handle_pcap, NULL);
+	    if (readfile_state < 2) {
+		/*
+		 * On some OSes select() might return 0 even when
+		 * there are packets to process.  Thus, we always
+		 * ignore its return value and just call pcap_dispatch()
+		 * anyway.
+		 */
+		if (0 == readfile_state) 	/* interactive */
+		    pcap_select(pcap, 1, 0);
+		x = pcap_dispatch(pcap, 50, handle_pcap, NULL);
+	    }
 	    if (0 == x && 1 == readfile_state) {
 		/* block on keyboard until user quits */
 		readfile_state++;
