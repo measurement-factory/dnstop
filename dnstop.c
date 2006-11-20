@@ -48,6 +48,7 @@
 #ifndef ETHERTYPE_8021Q
 #define ETHERTYPE_8021Q 0x8100
 #endif
+#define USE_ITIMER 1
 
 #if USE_PPP
 #include <net/if_ppp.h>
@@ -174,6 +175,7 @@ void Sld_report(void);
 void Nld_report(void);
 void Help_report(void);
 void ResetCounters(void);
+void report(void);
 
 typedef int Filter_t(unsigned short,
 	unsigned short,
@@ -657,9 +659,18 @@ cron_post(void)
 }
 
 void
+redraw()
+{
+    cron_pre();
+    report();
+    cron_post();
+}
+
+void
 keyboard(void)
 {
     int ch;
+    int refresh = 1;
     ch = getch() & 0xff;
     if (ch >= 'A' && ch <= 'Z')
 	ch += 'a' - 'A';
@@ -701,9 +712,21 @@ keyboard(void)
     case '?':
 	SubReport = Help_report;
 	break;
+    case ' ':
+	/* noop - fall through and refresh */
+	break;
     default:
+	refresh = 0;
 	break;
     }
+    if (refresh)
+	redraw();
+}
+
+void
+gotsigalrm(int sig)
+{
+    redraw();
 }
 
 void
@@ -1012,11 +1035,9 @@ report(void)
     print_func("%d new queries, %d total queries",
 	query_count_intvl, query_count_total);
     clrtoeol();
-    if (last_ts.tv_sec) {
-	time_t t = (time_t) last_ts.tv_sec;
-	move(0, 50);
-	print_func("%s", ctime(&t));
-    }
+    time_t t = time(NULL);
+    move(0, 50);
+    print_func("%s", ctime(&t));
     move(2, 0);
     clrtobot();
     if (SubReport)
@@ -1132,6 +1153,7 @@ usage(void)
     fprintf(stderr, "\t-b expr\tBPF program code\n");
     fprintf(stderr, "\t-i addr\tIgnore this source IP address\n");
     fprintf(stderr, "\t-p\tDon't put interface in promiscuous mode\n");
+    fprintf(stderr, "\t-r\tRedraw interval, in seconds\n");
     fprintf(stderr, "\t-s\tEnable 2nd level domain stats collection\n");
     fprintf(stderr, "\t-t\tEnable 3nd level domain stats collection\n");
     fprintf(stderr, "\t-f\tfilter-name\n");
@@ -1162,6 +1184,10 @@ main(int argc, char *argv[])
     int x;
     struct stat sb;
     int readfile_state = 0;
+    int redraw_interval = 1;
+#if USE_ITIMER
+    struct itimerval redraw_itv;
+#endif
     struct bpf_program fp;
 
     port53 = htons(53);
@@ -1171,7 +1197,7 @@ main(int argc, char *argv[])
     srandom(time(NULL));
     ResetCounters();
 
-    while ((x = getopt(argc, argv, "ab:f:i:pst")) != -1) {
+    while ((x = getopt(argc, argv, "ab:f:i:pr:st")) != -1) {
 	switch (x) {
 	case 'a':
 	    anon_flag = 1;
@@ -1193,6 +1219,9 @@ main(int argc, char *argv[])
 	    break;
 	case 'f':
 	    set_filter(optarg);
+	    break;
+	case 'r':
+	    redraw_interval = atoi(optarg);
 	    break;
 	default:
 	    usage();
@@ -1279,6 +1308,17 @@ main(int argc, char *argv[])
     }
     if (interactive) {
 	init_curses();
+	redraw();
+
+#if USE_ITIMER
+	signal(SIGALRM, gotsigalrm);
+	redraw_itv.it_interval.tv_sec = redraw_interval;
+	redraw_itv.it_interval.tv_usec = 0;
+	redraw_itv.it_value.tv_sec = redraw_interval;
+	redraw_itv.it_value.tv_usec = 0;
+	setitimer(ITIMER_REAL, &redraw_itv, NULL);
+#endif
+
 	while (0 == Quit) {
 	    if (readfile_state < 2) {
 		/*
@@ -1297,9 +1337,9 @@ main(int argc, char *argv[])
 		nodelay(w, 0);
 	    }
 	    keyboard();
-	    cron_pre();
-	    report();
-	    cron_post();
+#if !USE_ITIMER
+	    redraw();
+#endif
 	}
 	endwin();		/* klin, Thu Nov 28 08:56:51 2002 */
     } else {
