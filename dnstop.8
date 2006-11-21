@@ -14,6 +14,7 @@
 .Op Fl b Ar expression
 .Op Fl i Ar address
 .Op Fl f Ar filter
+.Op Fl r Ar interval
 .Op Ar device
 .Op Ar savefile
 .Sh DESCRIPTION
@@ -39,6 +40,8 @@ BPF filter expression
 ignore select addresses
 .It Fl p
 Do not put the interface into promiscuous mode.
+.It Fl r
+Redraw interval (seconds).
 .It Fl s
 collect second-level domain statistics
 .It Fl t

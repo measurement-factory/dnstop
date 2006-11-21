@@ -52,7 +52,6 @@ static hashfunc in_addr_hash;
 #ifndef ETHERTYPE_8021Q
 #define ETHERTYPE_8021Q 0x8100
 #endif
-#define USE_ITIMER 1
 
 #if USE_PPP
 #include <net/if_ppp.h>
@@ -164,7 +163,6 @@ struct bpf_timeval last_ts;
 #else
 struct timeval last_ts;
 #endif
-time_t last_report = 0;
 time_t report_interval = 1;
 
 
@@ -647,7 +645,11 @@ void
 keyboard(void)
 {
     int ch;
-    int refresh = 1;
+    int old_do_redraw = do_redraw;
+    /*
+     * The screen should be redrawn after any valid key is pressed.  
+     */
+    do_redraw = 1;
     ch = getch() & 0xff;
     if (ch >= 'A' && ch <= 'Z')
 	ch += 'a' - 'A';
@@ -690,14 +692,12 @@ keyboard(void)
 	SubReport = Help_report;
 	break;
     case ' ':
-	/* noop - fall through and refresh */
+	/* noop - just redraw the screen */
 	break;
     default:
-	refresh = 0;
+	do_redraw = old_do_redraw;
 	break;
     }
-    if (refresh)
-	redraw();
 }
 
 void
@@ -1015,9 +1015,6 @@ Destinatioreport(void)
 void
 report(void)
 {
-    if (last_ts.tv_sec - last_report < report_interval)
-	return;
-    last_report = last_ts.tv_sec;
     move(0, 0);
     print_func("%d new queries, %d total queries",
 	query_count_intvl, query_count_total);
@@ -1186,9 +1183,7 @@ main(int argc, char *argv[])
     struct stat sb;
     int readfile_state = 0;
     int redraw_interval = 1;
-#if USE_ITIMER
     struct itimerval redraw_itv;
-#endif
     struct bpf_program fp;
 
     port53 = htons(53);
@@ -1311,14 +1306,14 @@ main(int argc, char *argv[])
 	init_curses();
 	redraw();
 
-#if USE_ITIMER
-	signal(SIGALRM, gotsigalrm);
-	redraw_itv.it_interval.tv_sec = redraw_interval;
-	redraw_itv.it_interval.tv_usec = 0;
-	redraw_itv.it_value.tv_sec = redraw_interval;
-	redraw_itv.it_value.tv_usec = 0;
-	setitimer(ITIMER_REAL, &redraw_itv, NULL);
-#endif
+	if (redraw_interval) {
+	    signal(SIGALRM, gotsigalrm);
+	    redraw_itv.it_interval.tv_sec = redraw_interval;
+	    redraw_itv.it_interval.tv_usec = 0;
+	    redraw_itv.it_value.tv_sec = redraw_interval;
+	    redraw_itv.it_value.tv_usec = 0;
+	    setitimer(ITIMER_REAL, &redraw_itv, NULL);
+	}
 
 	while (0 == Quit) {
 	    if (readfile_state < 2) {
@@ -1338,10 +1333,7 @@ main(int argc, char *argv[])
 		nodelay(w, 0);
 	    }
 	    keyboard();
-#if !USE_ITIMER
-	    do_redraw = 1;
-#endif
-	    if (do_redraw)
+	    if (do_redraw || 0 == redraw_interval)
 		redraw();
 	}
 	endwin();		/* klin, Thu Nov 28 08:56:51 2002 */
