@@ -127,6 +127,7 @@ int sld_flag = 0;
 int nld_flag = 0;
 int promisc_flag = 1;
 AnonMap *Anons = NULL;
+int do_redraw = 1;
 
 /*
  * flags/features for non-interactive mode
@@ -162,6 +163,9 @@ struct bpf_timeval last_ts;
 #else
 struct timeval last_ts;
 #endif
+time_t last_report = 0;
+time_t report_interval = 1;
+
 
 /* Prototypes */
 void SldBySource_report(void);
@@ -664,6 +668,7 @@ redraw()
     cron_pre();
     report();
     cron_post();
+    do_redraw = 0;
 }
 
 void
@@ -726,7 +731,7 @@ keyboard(void)
 void
 gotsigalrm(int sig)
 {
-    redraw();
+    do_redraw = 1;
 }
 
 void
@@ -1031,6 +1036,9 @@ Destinatioreport(void)
 void
 report(void)
 {
+    if (last_ts.tv_sec - last_report < report_interval)
+	return;
+    last_report = last_ts.tv_sec;
     move(0, 0);
     print_func("%d new queries, %d total queries",
 	query_count_intvl, query_count_total);
@@ -1338,8 +1346,10 @@ main(int argc, char *argv[])
 	    }
 	    keyboard();
 #if !USE_ITIMER
-	    redraw();
+	    do_redraw = 1;
 #endif
+	    if (do_redraw)
+		redraw();
 	}
 	endwin();		/* klin, Thu Nov 28 08:56:51 2002 */
     } else {
