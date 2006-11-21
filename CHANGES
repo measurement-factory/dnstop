@@ -1,3 +1,16 @@
+
+2006/11/21 Duane Wessels
+
+    Changed most of the linked lists to hash tables.  This should
+    also result in less CPU usage on busy nameservers.
+
+2006/11/20 John Morrissey
+
+    A patch to use setitimer and SIGALRM for updating the display.
+    On busy nameservers this results in less CPU usage because
+    the display is updated less often.  The redraw interval can
+    be specified with the -r command line option.
+
 2006/05/17 Max Horn
 
     A few fixes for OS X.
