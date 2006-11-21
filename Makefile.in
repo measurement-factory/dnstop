@@ -4,6 +4,8 @@ DATE != date +%Y%m%d
 CC=gcc
 
 SRCS=	$(PROG).c \
+	hashtbl.c \
+	hashtbl.h \
 	known_tlds.h
 
 # You may need to uncomment this, esp on Solaris
@@ -11,8 +13,8 @@ XTRALIBS= # -lnsl -lresolv -lsocket
 
 all: $(PROG)
 
-$(PROG): $(PROG).o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(PROG).o -lpcap -lcurses $(XTRALIBS)
+$(PROG): $(PROG).o hashtbl.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(PROG).o hashtbl.o -lpcap -lcurses $(XTRALIBS)
 
 clean:
 	rm -f $(PROG) $(PROG).o $(PROG).core $(PROG).c~

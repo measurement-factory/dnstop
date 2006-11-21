@@ -38,6 +38,10 @@
 #include <netinet/ip.h>
 #include <netinet/udp.h>
 
+#include "hashtbl.h"
+static hashkeycmp in_addr_cmp;
+static hashfunc in_addr_hash;
+
 #define PCAP_SNAPLEN 1460
 #define MAX_QNAME_SZ 512
 #ifndef ETHER_HDR_LEN
@@ -60,34 +64,31 @@
 #define uh_dport dest
 #endif
 
-typedef struct _AgentAddr AgentAddr;
-struct _AgentAddr {
+typedef struct {
     struct in_addr src;
     int count;
-    AgentAddr *next;
-};
+} AgentAddr;
 
-typedef struct _StringCounter StringCounter;
-struct _StringCounter {
+typedef struct {
     char *s;
     int count;
-    StringCounter *next;
-};
+} StringCounter;
+
+typedef struct {
+    struct in_addr addr;
+    char *str;
+} StringAddr;
 
 /* This struct cobbles together Source and Sld */
-typedef struct _StringAddrCounter StringAddrCounter;
-struct _StringAddrCounter {
-    struct in_addr src;
-    char *str;
+typedef struct {
+    StringAddr straddr;
     int count;
-    StringAddrCounter *next;
-};
+} StringAddrCounter;
 
-typedef struct _foo foo;
-struct _foo {
+typedef struct {
     int cnt;
     void *ptr;
-};
+} SortItem;
 
 typedef struct _rfc1035_header rfc1035_header;
 struct _rfc1035_header {
@@ -151,13 +152,13 @@ int query_count_total = 0;
 int qtype_counts[T_MAX];
 int opcode_counts[OP_MAX];
 int qclass_counts[C_MAX];
-AgentAddr *Sources = NULL;
-AgentAddr *Destinations = NULL;
-StringCounter *Tlds = NULL;
-StringCounter *Slds = NULL;
-StringCounter *Nlds = NULL;
-StringAddrCounter *SSC2 = NULL;
-StringAddrCounter *SSC3 = NULL;
+hashtbl *Sources = NULL;
+hashtbl *Destinations = NULL;
+hashtbl *Tlds = NULL;
+hashtbl *Slds = NULL;
+hashtbl *Nlds = NULL;
+hashtbl *SSC2 = NULL;
+hashtbl *SSC3 = NULL;
 #ifdef __OpenBSD__
 struct bpf_timeval last_ts;
 #else
@@ -213,48 +214,82 @@ anon_inet_ntoa(struct in_addr a)
 }
 
 AgentAddr *
-AgentAddr_lookup_or_add(AgentAddr ** headP, struct in_addr a)
+AgentAddr_lookup_or_add(hashtbl *tbl, struct in_addr a)
 {
-    AgentAddr **T;
-    for (T = headP; (*T); T = &(*T)->next)
-	if ((*T)->src.s_addr == a.s_addr)
-	    return (*T);
-    (*T) = calloc(1, sizeof(**T));
-    (*T)->src = a;
-    return (*T);
+    AgentAddr *x = hash_find(&a, tbl);
+    if (NULL == x) {
+	x = calloc(1, sizeof(*x));
+	x->src = a;
+	hash_add(&x->src, x, tbl);
+    }
+    return x;
+}
+
+static unsigned int
+string_hash(const void *s)
+{
+	return SuperFastHash(s, strlen(s));
+}
+
+static int
+string_cmp(const void *a, const void *b)
+{
+	return strcmp(a, b);
 }
 
 StringCounter *
-StringCounter_lookup_or_add(StringCounter ** headP, const char *s)
+StringCounter_lookup_or_add(hashtbl * tbl, const char *s)
 {
-    StringCounter **T;
-    for (T = headP; (*T); T = &(*T)->next)
-	if (0 == strcmp((*T)->s, s))
-	    return (*T);
-    (*T) = calloc(1, sizeof(**T));
-    (*T)->s = strdup(s);
-    return (*T);
+    StringCounter *x = hash_find(s, tbl);
+    if (NULL == x) {
+	x = calloc(1, sizeof(*x));
+	x->s = strdup(s);
+	hash_add(x->s, x, tbl);
+    }
+    return x;
+}
+
+static unsigned int
+stringaddr_hash(const void *p)
+{
+	const StringAddr *sa = p;
+	unsigned int h1 = SuperFastHash(sa->str, strlen(sa->str));
+	unsigned int h2 = SuperFastHash((void*) &sa->addr, 4);
+	return h1 ^ h2;
+}
+
+static int
+stringaddr_cmp(const void *a, const void *b)
+{
+	const StringAddr *A = a;
+	const StringAddr *B = b;
+	int x = strcmp(A->str, B->str);
+	if (x)
+		return x;
+	return in_addr_cmp(&A->addr, &B->addr);
 }
 
 StringAddrCounter *
-StringAddrCounter_lookup_or_add(StringAddrCounter ** headP, struct in_addr a, const char *str)
+StringAddrCounter_lookup_or_add(hashtbl * tbl, struct in_addr a, const char *str)
 {
-    StringAddrCounter **T;
-    for (T = headP; (*T); T = &(*T)->next)
-	if (0 == strcmp((*T)->str, str))
-	    if ((*T)->src.s_addr == a.s_addr)
-		return (*T);
-    (*T) = calloc(1, sizeof(**T));
-    (*T)->str = strdup(str);
-    (*T)->src = a;
-    return (*T);
+    StringAddr sa;
+    sa.addr = a;
+    sa.str = (char *) str;
+    StringAddrCounter *x = hash_find(&sa, tbl);
+    if (NULL == x) {
+	x = calloc(1, sizeof(*x));
+	x->straddr.str = strdup(str);
+	x->straddr.addr = a;
+	hash_add(&x->straddr, x, tbl);
+    }
+    return x;
 }
 
 int
-foo_cmp(const void *A, const void *B)
+SortItem_cmp(const void *A, const void *B)
 {
-    const foo *a = A;
-    const foo *b = B;
+    const SortItem *a = A;
+    const SortItem *b = B;
     if (a->cnt < b->cnt)
 	return 1;
     if (a->cnt > b->cnt)
@@ -266,79 +301,22 @@ foo_cmp(const void *A, const void *B)
     return 0;
 }
 
-void
-AgentAddr_sort(AgentAddr ** headP)
+static unsigned int
+in_addr_hash(const void *key)
 {
-    foo *sortme;
-    int n_agents = 0;
-    int i;
-    AgentAddr *a;
-    for (a = *headP; a; a = a->next)
-	n_agents++;
-    sortme = calloc(n_agents, sizeof(foo));
-    n_agents = 0;
-    for (a = *headP; a; a = a->next) {
-	sortme[n_agents].cnt = a->count;
-	sortme[n_agents].ptr = a;
-	n_agents++;
-    }
-    qsort(sortme, n_agents, sizeof(foo), foo_cmp);
-    for (i = 0; i < n_agents; i++) {
-	*headP = sortme[i].ptr;
-	headP = &(*headP)->next;
-    }
-    free(sortme);
-    *headP = NULL;
+	return SuperFastHash(key, 4);
 }
 
-void
-StringCounter_sort(StringCounter ** headP)
+static int
+in_addr_cmp(const void *a, const void *b)
 {
-    foo *sortme;
-    int n_things = 0;
-    int i;
-    StringCounter *sc;
-    for (sc = *headP; sc; sc = sc->next)
-	n_things++;
-    sortme = calloc(n_things, sizeof(foo));
-    n_things = 0;
-    for (sc = *headP; sc; sc = sc->next) {
-	sortme[n_things].cnt = sc->count;
-	sortme[n_things].ptr = sc;
-	n_things++;
-    }
-    qsort(sortme, n_things, sizeof(foo), foo_cmp);
-    for (i = 0; i < n_things; i++) {
-	*headP = sortme[i].ptr;
-	headP = &(*headP)->next;
-    }
-    free(sortme);
-    *headP = NULL;
-}
-
-void
-StringAddrCounter_sort(StringAddrCounter ** headP)
-{
-    foo *sortme;
-    int n_things = 0;
-    int i;
-    StringAddrCounter *ssc;
-    for (ssc = *headP; ssc; ssc = ssc->next)
-	n_things++;
-    sortme = calloc(n_things, sizeof(foo));
-    n_things = 0;
-    for (ssc = *headP; ssc; ssc = ssc->next) {
-	sortme[n_things].cnt = ssc->count;
-	sortme[n_things].ptr = ssc;
-	n_things++;
-    }
-    qsort(sortme, n_things, sizeof(foo), foo_cmp);
-    for (i = 0; i < n_things; i++) {
-	*headP = sortme[i].ptr;
-	headP = &(*headP)->next;
-    }
-    free(sortme);
-    *headP = NULL;
+	struct in_addr A = * (struct in_addr *) a;
+	struct in_addr B = * (struct in_addr *) b;
+	if (A.s_addr < B.s_addr)
+		return -1;
+	if (A.s_addr > B.s_addr)
+		return 1;
+	return 0;
 }
 
 #define RFC1035_MAXLABELSZ 63
@@ -486,26 +464,26 @@ handle_dns(const char *buf, int len, const struct in_addr sip, const struct in_a
     opcode_counts[qh.opcode]++;
 
     s = QnameToNld(qname, 1);
-    sc = StringCounter_lookup_or_add(&Tlds, s);
+    sc = StringCounter_lookup_or_add(Tlds, s);
     sc->count++;
 
     if (sld_flag) {
 	s = QnameToNld(qname, 2);
-	sc = StringCounter_lookup_or_add(&Slds, s);
+	sc = StringCounter_lookup_or_add(Slds, s);
 	sc->count++;
 
 	/* increment StringAddrCounter */
-	ssc = StringAddrCounter_lookup_or_add(&SSC2, sip, s);
+	ssc = StringAddrCounter_lookup_or_add(SSC2, sip, s);
 	ssc->count++;
 
     }
     if (nld_flag) {
 	s = QnameToNld(qname, 3);
-	sc = StringCounter_lookup_or_add(&Nlds, s);
+	sc = StringCounter_lookup_or_add(Nlds, s);
 	sc->count++;
 
 	/* increment StringAddrCounter */
-	ssc = StringAddrCounter_lookup_or_add(&SSC3, sip, s);
+	ssc = StringAddrCounter_lookup_or_add(SSC3, sip, s);
 	ssc->count++;
 
     }
@@ -539,9 +517,9 @@ handle_ip(const struct ip *ip, int len)
     memcpy(buf, (void *) ip + offset, len - offset);
     if (0 == handle_udp((struct udphdr *) buf, len - offset, ip->ip_src, ip->ip_dst))
 	return 0;
-    clt = AgentAddr_lookup_or_add(&Sources, ip->ip_src);
+    clt = AgentAddr_lookup_or_add(Sources, ip->ip_src);
     clt->count++;
-    srv = AgentAddr_lookup_or_add(&Destinations, ip->ip_dst);
+    srv = AgentAddr_lookup_or_add(Destinations, ip->ip_dst);
     srv->count++;
     return 1;
 }
@@ -647,13 +625,7 @@ handle_pcap(u_char * udata, const struct pcap_pkthdr *hdr, const u_char * pkt)
 void
 cron_pre(void)
 {
-    AgentAddr_sort(&Sources);
-    AgentAddr_sort(&Destinations);
-    StringCounter_sort(&Tlds);
-    StringCounter_sort(&Slds);
-    StringCounter_sort(&Nlds);
-    StringAddrCounter_sort(&SSC2);
-    StringAddrCounter_sort(&SSC3);
+    (void) 0;
 }
 
 void
@@ -843,46 +815,41 @@ get_nlines(void)
 }
 
 void
-StringCounter_report(StringCounter * list, char *what)
+StringCounter_report(hashtbl * tbl, char *what)
 {
+    int sortsize = hash_count(tbl);
+    SortItem *sortme = calloc(sortsize, sizeof(SortItem));
+    int i;
     StringCounter *sc;
+    hash_iter_init(tbl);
+    sortsize = 0;
+    while ((sc = hash_iterate(tbl))) {
+        sortme[sortsize].cnt = sc->count;
+        sortme[sortsize].ptr = sc;
+        sortsize++;
+    }
+    qsort(sortme, sortsize, sizeof(SortItem), SortItem_cmp);
+
     int nlines = get_nlines();
     print_func("%-30s %9s %6s\n", what, "count", "%");
     print_func("%-30s %9s %6s\n",
 	"------------------------------", "---------", "------");
-    for (sc = list; sc; sc = sc->next) {
+    for (i = 0; i< nlines && i < sortsize; i++) {
+	sc = sortme[i].ptr;
 	print_func("%-30.30s %9d %6.1f\n",
 	    sc->s,
 	    sc->count,
 	    100.0 * sc->count / query_count_total);
-	if (0 == --nlines)
-	    break;
     }
+
+    free(sortme);
 }
 
 void
-StringCounter_free(StringCounter ** headP)
+StringAddrCounter_free(void *p)
 {
-    StringCounter *sc;
-    void *next;
-    for (sc = *headP; sc; sc = next) {
-	next = sc->next;
-	free(sc->s);
-	free(sc);
-    }
-    *headP = NULL;
-}
-void
-StringAddrCounter_free(StringAddrCounter ** headP)
-{
-    StringAddrCounter *ssc;
-    void *next;
-    for (ssc = *headP; ssc; ssc = next) {
-	next = ssc->next;
-	free(ssc->str);
-	free(ssc);
-    }
-    *headP = NULL;
+    StringAddrCounter *ssc = p;
+    free(ssc->straddr.str);
 }
 
 void
@@ -951,38 +918,62 @@ Opcodes_report(void)
 }
 
 void
-AgentAddr_report(AgentAddr * list, const char *what)
+AgentAddr_report(hashtbl * tbl, const char *what)
 {
-    AgentAddr *agent;
+    int sortsize = hash_count(tbl);
+    SortItem *sortme = calloc(sortsize, sizeof(SortItem));
+    int i;
+    AgentAddr *a;
+    hash_iter_init(tbl);
+    sortsize = 0;
+    while ((a = hash_iterate(tbl))) {
+	sortme[sortsize].cnt = a->count;
+	sortme[sortsize].ptr = a;
+	sortsize++;
+    }
+    qsort(sortme, sortsize, sizeof(SortItem), SortItem_cmp);
+
     int nlines = get_nlines();
     print_func("%-16s %9s %6s\n", what, "count", "%");
     print_func("%-16s %9s %6s\n", "----------------", "---------", "------");
-    for (agent = list; agent; agent = agent->next) {
+    for (i = 0; i<nlines && i<sortsize; i++) {
+	a = sortme[i].ptr;
 	print_func("%-16s %9d %6.1f\n",
-	    anon_inet_ntoa(agent->src),
-	    agent->count,
-	    100.0 * agent->count / query_count_total);
-	if (0 == --nlines)
-	    break;
+	    anon_inet_ntoa(a->src),
+	    a->count,
+	    100.0 * a->count / query_count_total);
     }
+
+    free(sortme);
 }
 
 void
-Combo_report(StringAddrCounter * list, char *what1, char *what2)
+StringAddrCounter_report(hashtbl * tbl, char *what1, char *what2)
 {
+    int sortsize = hash_count(tbl);
+    SortItem *sortme = calloc(sortsize, sizeof(SortItem));
+    int i;
     StringAddrCounter *ssc;
+    hash_iter_init(tbl);
+    sortsize = 0;
+    while ((ssc = hash_iterate(tbl))) {
+	sortme[sortsize].cnt = ssc->count;
+	sortme[sortsize].ptr = ssc;
+	sortsize++;
+    }
+    qsort(sortme, sortsize, sizeof(SortItem), SortItem_cmp);
+
     int nlines = get_nlines();
     print_func("%-16s %-32s %9s %6s\n", what1, what2, "count", "%");
     print_func("%-16s %-32s %9s %6s\n",
 	"----------------", "--------------------", "---------", "------");
-    for (ssc = list; ssc; ssc = ssc->next) {
+    for (i = 0; i<nlines && i<sortsize; i++) {
+	ssc = sortme[i].ptr;
 	print_func("%-16s %-32s %9d %6.1f\n",
-	    anon_inet_ntoa(ssc->src),
-	    ssc->str,
+	    anon_inet_ntoa(ssc->straddr.addr),
+	    ssc->straddr.str,
 	    ssc->count,
 	    100.0 * ssc->count / query_count_total);
-	if (0 == --nlines)
-	    break;
     }
 }
 
@@ -993,7 +984,7 @@ SldBySource_report(void)
 	print_func("\tYou must start %s with the -s option\n", progname);
 	print_func("\tto collect 2nd level domain stats.\n", progname);
     } else {
-	Combo_report(SSC2, "Source", "SLD");
+	StringAddrCounter_report(SSC2, "Source", "SLD");
     }
 }
 
@@ -1004,22 +995,10 @@ NldBySource_report(void)
 	print_func("\tYou must start %s with the -t option\n", progname);
 	print_func("\tto collect 3nd level domain stats.\n", progname);
     } else {
-	Combo_report(SSC3, "Source", "3LD");
+	StringAddrCounter_report(SSC3, "Source", "3LD");
     }
 }
 
-
-void
-AgentAddr_free(AgentAddr ** headP)
-{
-    AgentAddr *aa;
-    void *next;
-    for (aa = *headP; aa; aa = next) {
-	next = aa->next;
-	free(aa);
-    }
-    *headP = NULL;
-}
 
 void
 Sources_report(void)
@@ -1137,18 +1116,32 @@ init_curses(void)
 void
 ResetCounters(void)
 {
+    if (NULL == Sources)
+        Sources = hash_create(16384, in_addr_hash, in_addr_cmp);
+    if (NULL == Destinations)
+        Destinations = hash_create(16384, in_addr_hash, in_addr_cmp);
+    if (NULL == Tlds)
+        Tlds = hash_create(8192, string_hash, string_cmp);
+    if (NULL == Slds)
+        Slds = hash_create(8192, string_hash, string_cmp);
+    if (NULL == Nlds)
+        Nlds = hash_create(8192, string_hash, string_cmp);
+    if (NULL == SSC2)
+	SSC2 = hash_create(8192, stringaddr_hash, stringaddr_cmp);
+    if (NULL == SSC3)
+	SSC3 = hash_create(8192, stringaddr_hash, stringaddr_cmp);
     query_count_intvl = 0;
     query_count_total = 0;
     memset(qtype_counts, '\0', sizeof(qtype_counts));
     memset(qclass_counts, '\0', sizeof(qclass_counts));
     memset(opcode_counts, '\0', sizeof(opcode_counts));
-    AgentAddr_free(&Sources);
-    AgentAddr_free(&Destinations);
-    StringCounter_free(&Tlds);
-    StringCounter_free(&Slds);
-    StringCounter_free(&Nlds);
-    StringAddrCounter_free(&SSC2);
-    StringAddrCounter_free(&SSC3);
+    hash_free(Sources, free);
+    hash_free(Destinations, free);
+    hash_free(Tlds, free);
+    hash_free(Slds, free);
+    hash_free(Nlds, free);
+    hash_free(SSC2, StringAddrCounter_free);
+    hash_free(SSC3, StringAddrCounter_free);
     memset(&last_ts, '\0', sizeof(last_ts));
 }
 
