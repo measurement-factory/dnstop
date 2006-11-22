@@ -8,16 +8,19 @@ SRCS=	$(PROG).c \
 	hashtbl.h \
 	known_tlds.h
 
+OBJS=	$(PROG).o \
+	hashtbl.o
+
 # You may need to uncomment this, esp on Solaris
 XTRALIBS= # -lnsl -lresolv -lsocket
 
 all: $(PROG)
 
-$(PROG): $(PROG).o hashtbl.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(PROG).o hashtbl.o -lpcap -lcurses $(XTRALIBS)
+$(PROG): $(OBJS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) -lpcap -lcurses $(XTRALIBS)
 
 clean:
-	rm -f $(PROG) $(PROG).o $(PROG).core $(PROG).c~
+	rm -f $(PROG) $(OBJS) $(PROG).core $(PROG).c~
 
 tar:
 	mkdir $(PROG)-$(DATE)
