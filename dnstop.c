@@ -316,6 +316,18 @@ allocate_anonymous_address(struct in6_addr *anon_addr,
     anon_addr->s6_addr32[3] = *((uint32_t *) ptr->data);
 }
 
+int
+is_v4_in_v6(const struct in6_addr *addr)
+{
+	if (addr->s6_addr32[0])
+		return 0;
+	if (addr->s6_addr32[1])
+		return 0;
+	if (addr->s6_addr32[2] != ntohl(0x0000FFFF))
+		return 0;
+	return 1;
+}
+
 char *
 anon_inet_ntoa(const struct in6_addr *addr)
 {
@@ -326,9 +338,7 @@ anon_inet_ntoa(const struct in6_addr *addr)
 	allocate_anonymous_address(&anon_addr, addr);
 	addr = &anon_addr;
     }
-    if ((addr->s6_addr32[0] == 0)
-	&& (addr->s6_addr32[1] == 0)
-	&& (addr->s6_addr32[2] == ntohl(0x0000FFFF))) {
+    if (is_v4_in_v6(addr)) {
 	struct in_addr v4addr = {addr->s6_addr32[3]};
 
 	if (inet_ntop(AF_INET, (const void *)&v4addr,
@@ -435,7 +445,9 @@ SortItem_cmp(const void *A, const void *B)
 static unsigned int
 in_addr_hash(const void *key)
 {
-    return SuperFastHash(key, 4);
+    if (is_v4_in_v6(key))
+    	return SuperFastHash(key+12, 4);
+   return SuperFastHash(key, 16);
 }
 
 static int
