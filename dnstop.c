@@ -1,10 +1,10 @@
 /*
  * $Id$
- *
+ * 
  * http://dnstop.measurement-factory.com/
- *
- * Copyright (c) 2002, The Measurement Factory, Inc.  All rights
- * reserved.  See the LICENSE file for details.
+ * 
+ * Copyright (c) 2002, The Measurement Factory, Inc.  All rights reserved.  See
+ * the LICENSE file for details.
  */
 
 #include <sys/types.h>
@@ -71,28 +71,28 @@ static hashfunc in_addr_hash;
 typedef struct {
     struct in6_addr src;
     int count;
-} AgentAddr;
+}      AgentAddr;
 
 typedef struct {
     char *s;
     int count;
-} StringCounter;
+}      StringCounter;
 
 typedef struct {
     struct in6_addr addr;
     char *str;
-} StringAddr;
+}      StringAddr;
 
 /* This struct cobbles together Source and Sld */
 typedef struct {
     StringAddr straddr;
     int count;
-} StringAddrCounter;
+}      StringAddrCounter;
 
 typedef struct {
     int cnt;
     void *ptr;
-} SortItem;
+}      SortItem;
 
 typedef struct _rfc1035_header rfc1035_header;
 struct _rfc1035_header {
@@ -110,8 +110,7 @@ struct _rfc1035_header {
     unsigned short arcount;
 };
 
-struct ip_list_s
-{
+struct ip_list_s {
     struct in6_addr addr;
     void *data;
     struct ip_list_s *next;
@@ -123,8 +122,8 @@ pcap_t *pcap = NULL;
 char *bpf_program_str = "udp dst port 53 and udp[10:2] & 0x8000 = 0";
 WINDOW *w;
 static unsigned short port53;
-void (*SubReport) (void) = NULL;
-int (*handle_datalink) (const u_char * pkt, int len) = NULL;
+void (*SubReport) (void)= NULL;
+int (*handle_datalink) (const u_char * pkt, int len)= NULL;
 int Quit = 0;
 char *progname = NULL;
 int anon_flag = 0;
@@ -138,7 +137,7 @@ int do_redraw = 1;
  * flags/features for non-interactive mode
  */
 int interactive = 1;
-typedef int (printer)(const char *, ...);
+typedef int (printer) (const char *,...);
 printer *print_func = (printer *) printw;
 
 #define T_MAX 65536
@@ -185,11 +184,12 @@ void Help_report(void);
 void ResetCounters(void);
 void report(void);
 
-typedef int Filter_t(unsigned short,
-	unsigned short,
-	const char *,
-	const struct in6_addr *,
-	const struct in6_addr *);
+typedef int 
+Filter_t(unsigned short,
+    unsigned short,
+    const char *,
+    const struct in6_addr *,
+    const struct in6_addr *);
 Filter_t UnknownTldFilter;
 Filter_t AforAFilter;
 Filter_t RFC1918PtrFilter;
@@ -197,187 +197,175 @@ Filter_t *Filter = NULL;
 
 #define s6_addr32 __u6_addr.__u6_addr32
 
-int cmp_in6_addr (const struct in6_addr *a,
-      const struct in6_addr *b)
-  {
+int 
+cmp_in6_addr(const struct in6_addr *a,
+    const struct in6_addr *b)
+{
     int i;
 
     for (i = 0; i < 4; i++)
-      if (a->s6_addr32[i] != b->s6_addr32[i])
-          break;
+	if (a->s6_addr32[i] != b->s6_addr32[i])
+	    break;
 
     if (i >= 4)
-      return (0);
+	return (0);
 
     return (a->s6_addr32[i] > b->s6_addr32[i] ? 1 : -1);
-} /* int cmp_addrinfo */
+}				/* int cmp_addrinfo */
 
-inline int ignore_list_match (const struct in6_addr *addr)
+inline int 
+ignore_list_match(const struct in6_addr *addr)
 {
     ip_list_t *ptr;
 
     for (ptr = IgnoreList; ptr != NULL; ptr = ptr->next)
-      if (cmp_in6_addr (addr, &ptr->addr) == 0)
-          return (1);
+	if (cmp_in6_addr(addr, &ptr->addr) == 0)
+	    return (1);
     return (0);
-} /* int ignore_list_match */
+}				/* int ignore_list_match */
 
-void ignore_list_add (const struct in6_addr *addr)
+void 
+ignore_list_add(const struct in6_addr *addr)
 {
     ip_list_t *new;
 
-    if (ignore_list_match (addr) != 0)
-      return;
+    if (ignore_list_match(addr) != 0)
+	return;
 
-    new = malloc (sizeof (ip_list_t));
-    if (new == NULL)
-    {
-      perror ("malloc");
-      return;
+    new = malloc(sizeof(ip_list_t));
+    if (new == NULL) {
+	perror("malloc");
+	return;
     }
-
-    memcpy (&new->addr, addr, sizeof (struct in6_addr));
+    memcpy(&new->addr, addr, sizeof(struct in6_addr));
     new->next = IgnoreList;
 
     IgnoreList = new;
-} /* void ignore_list_add */
+}				/* void ignore_list_add */
 
-void ignore_list_add_name (const char *name)
+void 
+ignore_list_add_name(const char *name)
 {
     struct addrinfo *ai_list;
     struct addrinfo *ai_ptr;
-    struct in6_addr  addr;
+    struct in6_addr addr;
     int status;
 
-    status = getaddrinfo (name, NULL, NULL, &ai_list);
+    status = getaddrinfo(name, NULL, NULL, &ai_list);
     if (status != 0)
-      return;
+	return;
 
-    for (ai_ptr = ai_list; ai_ptr != NULL; ai_ptr = ai_ptr->ai_next)
-    {
-      if (ai_ptr->ai_family == AF_INET)
-      {
-          addr.s6_addr32[0] = 0;
-          addr.s6_addr32[1] = 0;
-          addr.s6_addr32[2] = htonl (0x0000FFFF);
-          addr.s6_addr32[3] = ((struct sockaddr_in *) ai_ptr->ai_addr)->sin_addr.s_addr;
+    for (ai_ptr = ai_list; ai_ptr != NULL; ai_ptr = ai_ptr->ai_next) {
+	if (ai_ptr->ai_family == AF_INET) {
+	    addr.s6_addr32[0] = 0;
+	    addr.s6_addr32[1] = 0;
+	    addr.s6_addr32[2] = htonl(0x0000FFFF);
+	    addr.s6_addr32[3] = ((struct sockaddr_in *)ai_ptr->ai_addr)->sin_addr.s_addr;
 
-          ignore_list_add (&addr);
-      }
-      else
-      {
-          ignore_list_add (&((struct sockaddr_in6 *) ai_ptr->ai_addr)->sin6_addr);
-      }
-    } /* for */
+	    ignore_list_add(&addr);
+	} else {
+	    ignore_list_add(&((struct sockaddr_in6 *)ai_ptr->ai_addr)->sin6_addr);
+	}
+    }				/* for */
 
-    freeaddrinfo (ai_list);
+    freeaddrinfo(ai_list);
 }
 
-void in6_addr_from_buffer (struct in6_addr *ia,
-      const void *buf, size_t buf_len,
-      int family)
+void 
+in6_addr_from_buffer(struct in6_addr *ia,
+    const void *buf, size_t buf_len,
+    int family)
 {
-    memset (ia, 0, sizeof (struct in6_addr));
-    if ((AF_INET == family) && (sizeof (uint32_t) == buf_len))
-    {
-      ia->s6_addr32[2] = htonl (0x0000FFFF);
-      ia->s6_addr32[3] = *((uint32_t *) buf);
-    }
-    else if ((AF_INET6 == family) && (sizeof (struct in6_addr) == buf_len))
-    {
-      memcpy (ia, buf, buf_len);
+    memset(ia, 0, sizeof(struct in6_addr));
+    if ((AF_INET == family) && (sizeof(uint32_t) == buf_len)) {
+	ia->s6_addr32[2] = htonl(0x0000FFFF);
+	ia->s6_addr32[3] = *((uint32_t *) buf);
+    } else if ((AF_INET6 == family) && (sizeof(struct in6_addr) == buf_len)) {
+	memcpy(ia, buf, buf_len);
     }
 }
 
 void
-allocate_anonymous_address (struct in6_addr *anon_addr,
-      const struct in6_addr *orig_addr)
+allocate_anonymous_address(struct in6_addr *anon_addr,
+    const struct in6_addr *orig_addr)
 {
     static ip_list_t *list = NULL;
     static uint32_t next_num = 0;
     ip_list_t *ptr;
 
-    memset (anon_addr, 0, sizeof (struct in6_addr));
+    memset(anon_addr, 0, sizeof(struct in6_addr));
 
-    for (ptr = list; ptr != NULL; ptr = ptr->next)
-    {
-      if (cmp_in6_addr (orig_addr, &ptr->addr) == 0)
-          break;
+    for (ptr = list; ptr != NULL; ptr = ptr->next) {
+	if (cmp_in6_addr(orig_addr, &ptr->addr) == 0)
+	    break;
     }
 
-    if (ptr == NULL)
-    {
-      ptr = (ip_list_t *) malloc (sizeof (ip_list_t) + sizeof (uint32_t));
-      if (ptr == NULL)
-          return;
+    if (ptr == NULL) {
+	ptr = (ip_list_t *) malloc(sizeof(ip_list_t) + sizeof(uint32_t));
+	if (ptr == NULL)
+	    return;
 
-      ptr->addr = *orig_addr;
-      ptr->data = (void *) (ptr + 1);
-      *((uint32_t *) ptr->data) = next_num;
-      next_num++;
+	ptr->addr = *orig_addr;
+	ptr->data = (void *)(ptr + 1);
+	*((uint32_t *) ptr->data) = next_num;
+	next_num++;
 
-      ptr->next = list;
-      list = ptr;
+	ptr->next = list;
+	list = ptr;
     }
-
     anon_addr->s6_addr32[3] = *((uint32_t *) ptr->data);
-  }
-  
+}
+
 char *
 anon_inet_ntoa(const struct in6_addr *addr)
-  {
+{
     static char buffer[INET6_ADDRSTRLEN];
     struct in6_addr anon_addr;
 
-      if (anon_flag)
-    {
-      allocate_anonymous_address (&anon_addr, addr);
-      addr = &anon_addr;
+    if (anon_flag) {
+	allocate_anonymous_address(&anon_addr, addr);
+	addr = &anon_addr;
     }
-
     if ((addr->s6_addr32[0] == 0)
-          && (addr->s6_addr32[1] == 0)
-          && (addr->s6_addr32[2] == ntohl (0x0000FFFF)))
-    {
-      struct in_addr v4addr = { addr->s6_addr32[3] };
+	&& (addr->s6_addr32[1] == 0)
+	&& (addr->s6_addr32[2] == ntohl(0x0000FFFF))) {
+	struct in_addr v4addr = {addr->s6_addr32[3]};
 
-      if (inet_ntop (AF_INET, (const void *) &v4addr,
-                  buffer, sizeof (buffer)) == NULL)
-          return (NULL);
-    }
-    else
-    {
-      if (inet_ntop (AF_INET6, (const void *) addr,
-                  buffer, sizeof (buffer)) == NULL)
-          return (NULL);
+	if (inet_ntop(AF_INET, (const void *)&v4addr,
+		buffer, sizeof(buffer)) == NULL)
+	    return (NULL);
+    } else {
+	if (inet_ntop(AF_INET6, (const void *)addr,
+		buffer, sizeof(buffer)) == NULL)
+	    return (NULL);
     }
 
     return (buffer);
-  }
-  
+}
+
 AgentAddr *
-AgentAddr_lookup_or_add(hashtbl *tbl, struct in6_addr *addr)
-  {
+AgentAddr_lookup_or_add(hashtbl * tbl, struct in6_addr *addr)
+{
     AgentAddr *x = hash_find(addr, tbl);
     if (NULL == x) {
-        x = calloc(1, sizeof(*x));
-        x->src = *addr;
-        hash_add(&x->src, x, tbl);
+	x = calloc(1, sizeof(*x));
+	x->src = *addr;
+	hash_add(&x->src, x, tbl);
     }
     return x;
-  }
-  
+}
+
 
 static unsigned int
 string_hash(const void *s)
 {
-	return SuperFastHash(s, strlen(s));
+    return SuperFastHash(s, strlen(s));
 }
 
 static int
 string_cmp(const void *a, const void *b)
 {
-	return strcmp(a, b);
+    return strcmp(a, b);
 }
 
 StringCounter *
@@ -395,21 +383,21 @@ StringCounter_lookup_or_add(hashtbl * tbl, const char *s)
 static unsigned int
 stringaddr_hash(const void *p)
 {
-	const StringAddr *sa = p;
-	unsigned int h1 = SuperFastHash(sa->str, strlen(sa->str));
-	unsigned int h2 = SuperFastHash((void*) &sa->addr, 4);
-	return h1 ^ h2;
+    const StringAddr *sa = p;
+    unsigned int h1 = SuperFastHash(sa->str, strlen(sa->str));
+    unsigned int h2 = SuperFastHash((void *)&sa->addr, 4);
+    return h1 ^ h2;
 }
 
 static int
 stringaddr_cmp(const void *a, const void *b)
 {
-	const StringAddr *A = a;
-	const StringAddr *B = b;
-	int x = strcmp(A->str, B->str);
-	if (x)
-		return x;
-	return in_addr_cmp(&A->addr, &B->addr);
+    const StringAddr *A = a;
+    const StringAddr *B = b;
+    int x = strcmp(A->str, B->str);
+    if (x)
+	return x;
+    return in_addr_cmp(&A->addr, &B->addr);
 }
 
 StringAddrCounter *
@@ -417,13 +405,13 @@ StringAddrCounter_lookup_or_add(hashtbl * tbl, const struct in6_addr *addr, cons
 {
     StringAddr sa;
     sa.addr = *addr;
-    sa.str = (char *) str;
+    sa.str = (char *)str;
     StringAddrCounter *x = hash_find(&sa, tbl);
     if (NULL == x) {
-        x = calloc(1, sizeof(*x));
-        x->straddr.str = strdup(str);
-        x->straddr.addr = *addr;
-        hash_add(&x->straddr, x, tbl);
+	x = calloc(1, sizeof(*x));
+	x->straddr.str = strdup(str);
+	x->straddr.addr = *addr;
+	hash_add(&x->straddr, x, tbl);
     }
     return x;
 }
@@ -447,19 +435,19 @@ SortItem_cmp(const void *A, const void *B)
 static unsigned int
 in_addr_hash(const void *key)
 {
-	return SuperFastHash(key, 4);
+    return SuperFastHash(key, 4);
 }
 
 static int
 in_addr_cmp(const void *a, const void *b)
 {
-	struct in_addr A = * (struct in_addr *) a;
-	struct in_addr B = * (struct in_addr *) b;
-	if (A.s_addr < B.s_addr)
-		return -1;
-	if (A.s_addr > B.s_addr)
-		return 1;
-	return 0;
+    struct in_addr A = *(struct in_addr *)a;
+    struct in_addr B = *(struct in_addr *)b;
+    if (A.s_addr < B.s_addr)
+	return -1;
+    if (A.s_addr > B.s_addr)
+	return 1;
+    return 0;
 }
 
 #define RFC1035_MAXLABELSZ 63
@@ -538,8 +526,8 @@ QnameToNld(const char *qname, int nld)
 
 int
 handle_dns(const char *buf, int len,
-	const struct in6_addr *s_addr,
-	const struct in6_addr *d_addr)
+    const struct in6_addr *s_addr,
+    const struct in6_addr *d_addr)
 {
     rfc1035_header qh;
     unsigned short us;
@@ -635,8 +623,8 @@ handle_dns(const char *buf, int len,
 
 int
 handle_udp(const struct udphdr *udp, int len,
-       const struct in6_addr *s_addr,
-       const struct in6_addr *d_addr)
+    const struct in6_addr *s_addr,
+    const struct in6_addr *d_addr)
 {
     char buf[PCAP_SNAPLEN];
     if (port53 != udp->uh_dport)
@@ -647,8 +635,8 @@ handle_udp(const struct udphdr *udp, int len,
     return 1;
 }
 
-  int
-handle_ipv6 (struct ip6_hdr *ipv6, int len)
+int
+handle_ipv6(struct ip6_hdr *ipv6, int len)
 {
     char buf[PCAP_SNAPLEN];
     int offset;
@@ -660,67 +648,68 @@ handle_ipv6 (struct ip6_hdr *ipv6, int len)
 
     AgentAddr *agent;
 
-    offset = sizeof (struct ip6_hdr);
+    offset = sizeof(struct ip6_hdr);
     nexthdr = ipv6->ip6_nxt;
     s_addr = ipv6->ip6_src;
     d_addr = ipv6->ip6_dst;
-    payload_len = ntohs (ipv6->ip6_plen);
+    payload_len = ntohs(ipv6->ip6_plen);
 
-    if (ignore_list_match (&s_addr))
-          return (0);
+    if (ignore_list_match(&s_addr))
+	return (0);
 
-    /* Parse extension headers. This only handles the standard headers, as
-     * defined in RFC 2460, correctly. Fragments are discarded. */
-    while ((IPPROTO_ROUTING == nexthdr) /* routing header */
-          || (IPPROTO_HOPOPTS == nexthdr) /* Hop-by-Hop options. */
-          || (IPPROTO_FRAGMENT == nexthdr) /* fragmentation header. */
-          || (IPPROTO_DSTOPTS == nexthdr) /* destination options. */
-          || (IPPROTO_DSTOPTS == nexthdr) /* destination options. */
-          || (IPPROTO_AH == nexthdr) /* destination options. */
-          || (IPPROTO_ESP == nexthdr)) /* encapsulating security payload. */
-    {
-      struct ip6_ext ext_hdr;
-      uint16_t ext_hdr_len;
+    /*
+     * Parse extension headers. This only handles the standard headers, as
+     * defined in RFC 2460, correctly. Fragments are discarded.
+     */
+    while ((IPPROTO_ROUTING == nexthdr)	/* routing header */
+	||(IPPROTO_HOPOPTS == nexthdr)	/* Hop-by-Hop options. */
+	||(IPPROTO_FRAGMENT == nexthdr)	/* fragmentation header. */
+	||(IPPROTO_DSTOPTS == nexthdr)	/* destination options. */
+	||(IPPROTO_DSTOPTS == nexthdr)	/* destination options. */
+	||(IPPROTO_AH == nexthdr)	/* destination options. */
+	||(IPPROTO_ESP == nexthdr)) {	/* encapsulating security payload. */
+	struct ip6_ext ext_hdr;
+	uint16_t ext_hdr_len;
 
-      /* Catch broken packets */
-      if ((offset + sizeof (struct ip6_ext)) > len)
-          return (0);
+	/* Catch broken packets */
+	if ((offset + sizeof(struct ip6_ext)) > len)
+	    return (0);
 
-      /* Cannot handle fragments. */
-      if (IPPROTO_FRAGMENT == nexthdr)
-          return (0);
+	/* Cannot handle fragments. */
+	if (IPPROTO_FRAGMENT == nexthdr)
+	    return (0);
 
-      memcpy (&ext_hdr, (char *) ipv6 + offset, sizeof (struct ip6_ext));
-      nexthdr = ext_hdr.ip6e_nxt;
-      ext_hdr_len = (8 * (ntohs (ext_hdr.ip6e_len) + 1));
+	memcpy(&ext_hdr, (char *)ipv6 + offset, sizeof(struct ip6_ext));
+	nexthdr = ext_hdr.ip6e_nxt;
+	ext_hdr_len = (8 * (ntohs(ext_hdr.ip6e_len) + 1));
 
-      /* This header is longer than the packets payload.. WTF? */
-      if (ext_hdr_len > payload_len)
-          return (0);
+	/* This header is longer than the packets payload.. WTF? */
+	if (ext_hdr_len > payload_len)
+	    return (0);
 
-      offset += ext_hdr_len;
-      payload_len -= ext_hdr_len;
-    } /* while */
+	offset += ext_hdr_len;
+	payload_len -= ext_hdr_len;
+    }				/* while */
 
     /* Catch broken and empty packets */
     if (((offset + payload_len) > len)
-          || (payload_len == 0)
-          || (payload_len > PCAP_SNAPLEN))
-      return (0);
+	|| (payload_len == 0)
+	|| (payload_len > PCAP_SNAPLEN))
+	return (0);
 
     if (IPPROTO_UDP != nexthdr)
-      return (0);
+	return (0);
 
-    memcpy (buf, (char *) ipv6 + offset, payload_len);
-    if (handle_udp ((struct udphdr *) buf, payload_len, &s_addr, &d_addr) == 0)
-      return (0);
+    memcpy(buf, (char *)ipv6 + offset, payload_len);
+    if (handle_udp((struct udphdr *)buf, payload_len, &s_addr, &d_addr) == 0)
+	return (0);
 
-    if ((agent = AgentAddr_lookup_or_add (Sources, &s_addr)) != NULL)
-      agent->count++;
-    if ((agent = AgentAddr_lookup_or_add (Destinations, &d_addr)) != NULL)
-      agent->count++;
+    if ((agent = AgentAddr_lookup_or_add(Sources, &s_addr)) != NULL)
+	agent->count++;
+    if ((agent = AgentAddr_lookup_or_add(Destinations, &d_addr)) != NULL)
+	agent->count++;
 
-    return (1); /* Success */
+    return (1);			/* Success */
 }
 
 
@@ -731,25 +720,25 @@ handle_ipv4(const struct ip *ip, int len)
     int offset = ip->ip_hl << 2;
     AgentAddr *clt;
     AgentAddr *srv;
-     struct in6_addr s_addr;
-     struct in6_addr d_addr;
- 
-     if (ip->ip_v == 6)
-       return (handle_ipv6 ((struct ip6_hdr *) ip, len));
- 
-     in6_addr_from_buffer (&s_addr, &ip->ip_src.s_addr, sizeof (ip->ip_src.s_addr), AF_INET);
-     in6_addr_from_buffer (&d_addr, &ip->ip_dst.s_addr, sizeof (ip->ip_dst.s_addr), AF_INET);
-     if (ignore_list_match (&s_addr))
-           return (0);
+    struct in6_addr s_addr;
+    struct in6_addr d_addr;
+
+    if (ip->ip_v == 6)
+	return (handle_ipv6((struct ip6_hdr *)ip, len));
+
+    in6_addr_from_buffer(&s_addr, &ip->ip_src.s_addr, sizeof(ip->ip_src.s_addr), AF_INET);
+    in6_addr_from_buffer(&d_addr, &ip->ip_dst.s_addr, sizeof(ip->ip_dst.s_addr), AF_INET);
+    if (ignore_list_match(&s_addr))
+	return (0);
 
     if (IPPROTO_UDP != ip->ip_p)
 	return 0;
-    memcpy(buf, (void *) ip + offset, len - offset);
-     if (0 == handle_udp((struct udphdr *) buf, len - offset, &s_addr, &d_addr))
-        return 0;
-     clt = AgentAddr_lookup_or_add(Sources, &s_addr);
-      clt->count++;
-     srv = AgentAddr_lookup_or_add(Destinations, &d_addr);
+    memcpy(buf, (void *)ip + offset, len - offset);
+    if (0 == handle_udp((struct udphdr *)buf, len - offset, &s_addr, &d_addr))
+	return 0;
+    clt = AgentAddr_lookup_or_add(Sources, &s_addr);
+    clt->count++;
+    srv = AgentAddr_lookup_or_add(Destinations, &d_addr);
     srv->count++;
     return 1;
 }
@@ -782,7 +771,7 @@ handle_ppp(const u_char * pkt, int len)
     if (ETHERTYPE_IP != proto && PPP_IP != proto)
 	return 0;
     memcpy(buf, pkt, len);
-    return handle_ipv4((struct ip *) buf, len);
+    return handle_ipv4((struct ip *)buf, len);
 }
 
 #endif
@@ -794,7 +783,7 @@ handle_null(const u_char * pkt, int len)
     memcpy(&family, pkt, sizeof(family));
     if (AF_INET != family)
 	return 0;
-    return handle_ipv4((struct ip *) (pkt + 4), len - 4);
+    return handle_ipv4((struct ip *)(pkt + 4), len - 4);
 }
 
 #ifdef DLT_LOOP
@@ -805,7 +794,7 @@ handle_loop(const u_char * pkt, int len)
     memcpy(&family, pkt, sizeof(family));
     if (AF_INET != ntohl(family))
 	return 0;
-    return handle_ipv4((struct ip *) (pkt + 4), len - 4);
+    return handle_ipv4((struct ip *)(pkt + 4), len - 4);
 }
 
 #endif
@@ -814,7 +803,7 @@ handle_loop(const u_char * pkt, int len)
 int
 handle_raw(const u_char * pkt, int len)
 {
-    return handle_ipv4((struct ip *) pkt, len);
+    return handle_ipv4((struct ip *)pkt, len);
 }
 
 #endif
@@ -823,14 +812,14 @@ int
 handle_ether(const u_char * pkt, int len)
 {
     char buf[PCAP_SNAPLEN];
-    struct ether_header *e = (void *) pkt;
+    struct ether_header *e = (void *)pkt;
     unsigned short etype = ntohs(e->ether_type);
     if (len < ETHER_HDR_LEN)
 	return 0;
     pkt += ETHER_HDR_LEN;
     len -= ETHER_HDR_LEN;
     if (ETHERTYPE_8021Q == etype) {
-	etype = ntohs(*(unsigned short *) (pkt + 2));
+	etype = ntohs(*(unsigned short *)(pkt + 2));
 	pkt += 4;
 	len -= 4;
     }
@@ -838,9 +827,9 @@ handle_ether(const u_char * pkt, int len)
 	return 0;
     memcpy(buf, pkt, len);
     if (ETHERTYPE_IPV6 == etype)
-	return (handle_ipv6 ((struct ip6_hdr *) buf, len));
+	return (handle_ipv6((struct ip6_hdr *)buf, len));
     else
-	return handle_ipv4((struct ip *) buf, len);
+	return handle_ipv4((struct ip *)buf, len);
 }
 
 void
@@ -858,7 +847,7 @@ handle_pcap(u_char * udata, const struct pcap_pkthdr *hdr, const u_char * pkt)
 void
 cron_pre(void)
 {
-    (void) 0;
+    (void)0;
 }
 
 void
@@ -882,7 +871,7 @@ keyboard(void)
     int ch;
     int old_do_redraw = do_redraw;
     /*
-     * The screen should be redrawn after any valid key is pressed.  
+     * The screen should be redrawn after any valid key is pressed.
      */
     do_redraw = 1;
     ch = getch() & 0xff;
@@ -1043,10 +1032,10 @@ opcode_str(int o)
 int
 get_nlines(void)
 {
-	if (interactive)
-		return getmaxy(w) - 6;
-	else
-		return 50;
+    if (interactive)
+	return getmaxy(w) - 6;
+    else
+	return 50;
 }
 
 void
@@ -1059,9 +1048,9 @@ StringCounter_report(hashtbl * tbl, char *what)
     hash_iter_init(tbl);
     sortsize = 0;
     while ((sc = hash_iterate(tbl))) {
-        sortme[sortsize].cnt = sc->count;
-        sortme[sortsize].ptr = sc;
-        sortsize++;
+	sortme[sortsize].cnt = sc->count;
+	sortme[sortsize].ptr = sc;
+	sortsize++;
     }
     qsort(sortme, sortsize, sizeof(SortItem), SortItem_cmp);
 
@@ -1069,7 +1058,7 @@ StringCounter_report(hashtbl * tbl, char *what)
     print_func("%-30s %9s %6s\n", what, "count", "%");
     print_func("%-30s %9s %6s\n",
 	"------------------------------", "---------", "------");
-    for (i = 0; i< nlines && i < sortsize; i++) {
+    for (i = 0; i < nlines && i < sortsize; i++) {
 	sc = sortme[i].ptr;
 	print_func("%-30.30s %9d %6.1f\n",
 	    sc->s,
@@ -1171,7 +1160,7 @@ AgentAddr_report(hashtbl * tbl, const char *what)
     int nlines = get_nlines();
     print_func("%-40s %9s %6s\n", what, "count", "%");
     print_func("%-40s %9s %6s\n", "----------------", "---------", "------");
-    for (i = 0; i<nlines && i<sortsize; i++) {
+    for (i = 0; i < nlines && i < sortsize; i++) {
 	a = sortme[i].ptr;
 	print_func("%-40s %9d %6.1f\n",
 	    anon_inet_ntoa(&a->src),
@@ -1202,7 +1191,7 @@ StringAddrCounter_report(hashtbl * tbl, char *what1, char *what2)
     print_func("%-40s %-32s %9s %6s\n", what1, what2, "count", "%");
     print_func("%-40s %-32s %9s %6s\n",
 	"----------------", "--------------------", "---------", "------");
-    for (i = 0; i<nlines && i<sortsize; i++) {
+    for (i = 0; i < nlines && i < sortsize; i++) {
 	ssc = sortme[i].ptr;
 	print_func("%-40s %-32s %9d %6.1f\n",
 	    anon_inet_ntoa(&ssc->straddr.addr),
@@ -1272,8 +1261,8 @@ report(void)
 
 int
 UnknownTldFilter(unsigned short qt, unsigned short qc, const char *qn,
-	const struct in6_addr *sip,
-	const struct in6_addr *dip)
+    const struct in6_addr *sip,
+    const struct in6_addr *dip)
 {
     const char *tld = QnameToNld(qn, 1);
     unsigned int i;
@@ -1287,27 +1276,27 @@ UnknownTldFilter(unsigned short qt, unsigned short qc, const char *qn,
 
 int
 AforAFilter(unsigned short qt, unsigned short qc, const char *qn,
-	const struct in6_addr *sip,
-	const struct in6_addr *dip)
+    const struct in6_addr *sip,
+    const struct in6_addr *dip)
 {
     struct in_addr a;
     if (qt != T_A)
-	return 0;  
+	return 0;
     return inet_aton(qn, &a);
 }
 
 int
 RFC1918PtrFilter(unsigned short qt, unsigned short qc, const char *qn,
-	const struct in6_addr *sip,
-	const struct in6_addr *dip)
+    const struct in6_addr *sip,
+    const struct in6_addr *dip)
 {
     char *t;
-    char q[128];   
+    char q[128];
     unsigned int i = 0;
     if (qt != T_PTR)
-	return 0;  
-    strncpy(q, qn, sizeof(q)-1);
-    q[sizeof(q)-1] = '\0';
+	return 0;
+    strncpy(q, qn, sizeof(q) - 1);
+    q[sizeof(q) - 1] = '\0';
     t = strstr(q, ".in-addr.arpa");
     if (NULL == t)
 	return 0;
@@ -1328,14 +1317,14 @@ RFC1918PtrFilter(unsigned short qt, unsigned short qc, const char *qn,
 void
 set_filter(const char *fn)
 {
-	if (0 == strcmp(fn, "unknown-tlds"))
-		Filter = UnknownTldFilter;
-	else if (0 == strcmp(fn, "A-for-A"))
-		Filter = AforAFilter;
-	else if (0 == strcmp(fn, "rfc1918-ptr"))
-		Filter = RFC1918PtrFilter;
-	else
-		Filter = NULL;
+    if (0 == strcmp(fn, "unknown-tlds"))
+	Filter = UnknownTldFilter;
+    else if (0 == strcmp(fn, "A-for-A"))
+	Filter = AforAFilter;
+    else if (0 == strcmp(fn, "rfc1918-ptr"))
+	Filter = RFC1918PtrFilter;
+    else
+	Filter = NULL;
 }
 
 /*
@@ -1355,15 +1344,15 @@ void
 ResetCounters(void)
 {
     if (NULL == Sources)
-        Sources = hash_create(16384, in_addr_hash, in_addr_cmp);
+	Sources = hash_create(16384, in_addr_hash, in_addr_cmp);
     if (NULL == Destinations)
-        Destinations = hash_create(16384, in_addr_hash, in_addr_cmp);
+	Destinations = hash_create(16384, in_addr_hash, in_addr_cmp);
     if (NULL == Tlds)
-        Tlds = hash_create(8192, string_hash, string_cmp);
+	Tlds = hash_create(8192, string_hash, string_cmp);
     if (NULL == Slds)
-        Slds = hash_create(8192, string_hash, string_cmp);
+	Slds = hash_create(8192, string_hash, string_cmp);
     if (NULL == Nlds)
-        Nlds = hash_create(8192, string_hash, string_cmp);
+	Nlds = hash_create(8192, string_hash, string_cmp);
     if (NULL == SSC2)
 	SSC2 = hash_create(8192, stringaddr_hash, stringaddr_cmp);
     if (NULL == SSC3)
@@ -1451,7 +1440,7 @@ main(int argc, char *argv[])
 	    bpf_program_str = strdup(optarg);
 	    break;
 	case 'i':
-	    ignore_list_add_name (optarg);
+	    ignore_list_add_name(optarg);
 	    break;
 	case 'f':
 	    set_filter(optarg);
@@ -1482,7 +1471,6 @@ main(int argc, char *argv[])
 	fprintf(stderr, "pcap_open_*: %s\n", errbuf);
 	exit(1);
     }
-
     if (0 == isatty(1)) {
 	if (0 == readfile_state) {
 	    fprintf(stderr, "Non-interactive mode requires savefile argument\n");
@@ -1491,7 +1479,6 @@ main(int argc, char *argv[])
 	interactive = 0;
 	print_func = printf;
     }
-
     memset(&fp, '\0', sizeof(fp));
     x = pcap_compile(pcap, &fp, bpf_program_str, 1, 0);
     if (x < 0) {
@@ -1503,17 +1490,15 @@ main(int argc, char *argv[])
 	fprintf(stderr, "pcap_setfilter failed\n");
 	exit(1);
     }
-
     /*
-     * non-blocking call added for Mac OS X bugfix.  Sent by Max Horn.
-     * ref http://www.tcpdump.org/lists/workers/2002/09/msg00033.html
+     * non-blocking call added for Mac OS X bugfix.  Sent by Max Horn. ref
+     * http://www.tcpdump.org/lists/workers/2002/09/msg00033.html
      */
     x = pcap_setnonblock(pcap, 1, errbuf);
     if (x < 0) {
 	fprintf(stderr, "pcap_setnonblock failed: %s\n", errbuf);
 	exit(1);
     }
-
     switch (pcap_datalink(pcap)) {
     case DLT_EN10MB:
 	handle_datalink = handle_ether;
@@ -1554,16 +1539,14 @@ main(int argc, char *argv[])
 	    redraw_itv.it_value.tv_usec = 0;
 	    setitimer(ITIMER_REAL, &redraw_itv, NULL);
 	}
-
 	while (0 == Quit) {
 	    if (readfile_state < 2) {
 		/*
-		 * On some OSes select() might return 0 even when
-		 * there are packets to process.  Thus, we always
-		 * ignore its return value and just call pcap_dispatch()
-		 * anyway.
+		 * On some OSes select() might return 0 even when there are
+		 * packets to process.  Thus, we always ignore its return value
+		 * and just call pcap_dispatch() anyway.
 		 */
-		if (0 == readfile_state) 	/* interactive */
+		if (0 == readfile_state)	/* interactive */
 		    pcap_select(pcap, 1, 0);
 		x = pcap_dispatch(pcap, 50, handle_pcap, NULL);
 	    }
@@ -1579,15 +1562,22 @@ main(int argc, char *argv[])
 	endwin();		/* klin, Thu Nov 28 08:56:51 2002 */
     } else {
 	while (pcap_dispatch(pcap, 50, handle_pcap, NULL))
-		(void) 0;
+	    (void)0;
 	cron_pre();
-	Sources_report(); print_func("\n");
-	Destinatioreport(); print_func("\n");
-	Qtypes_report(); print_func("\n");
-	Opcodes_report(); print_func("\n");
-	Tld_report(); print_func("\n");
-	Sld_report(); print_func("\n");
-	Nld_report(); print_func("\n");
+	Sources_report();
+	print_func("\n");
+	Destinatioreport();
+	print_func("\n");
+	Qtypes_report();
+	print_func("\n");
+	Opcodes_report();
+	print_func("\n");
+	Tld_report();
+	print_func("\n");
+	Sld_report();
+	print_func("\n");
+	Nld_report();
+	print_func("\n");
 	SldBySource_report();
     }
 
