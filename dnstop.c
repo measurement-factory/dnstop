@@ -36,7 +36,9 @@
 
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
+#include <netinet/ip6.h>
 #include <netinet/udp.h>
+#include <netdb.h>
 
 #include "hashtbl.h"
 static hashkeycmp in_addr_cmp;
@@ -52,6 +54,9 @@ static hashfunc in_addr_hash;
 #ifndef ETHERTYPE_8021Q
 #define ETHERTYPE_8021Q 0x8100
 #endif
+#ifndef ETHERTYPE_IPV6
+#define ETHERTYPE_IPV6 0x86DD
+#endif
 
 #if USE_PPP
 #include <net/if_ppp.h>
@@ -64,7 +69,7 @@ static hashfunc in_addr_hash;
 #endif
 
 typedef struct {
-    struct in_addr src;
+    struct in6_addr src;
     int count;
 } AgentAddr;
 
@@ -74,7 +79,7 @@ typedef struct {
 } StringCounter;
 
 typedef struct {
-    struct in_addr addr;
+    struct in6_addr addr;
     char *str;
 } StringAddr;
 
@@ -105,15 +110,15 @@ struct _rfc1035_header {
     unsigned short arcount;
 };
 
-typedef struct _AnonMap AnonMap;
-struct _AnonMap {
-    struct in_addr real;
-    struct in_addr anon;
-    AnonMap *next;
+struct ip_list_s
+{
+    struct in6_addr addr;
+    void *data;
+    struct ip_list_s *next;
 };
+typedef struct ip_list_s ip_list_t;
 
 char *device = NULL;
-struct in_addr ignore_addr;
 pcap_t *pcap = NULL;
 char *bpf_program_str = "udp dst port 53 and udp[10:2] & 0x8000 = 0";
 WINDOW *w;
@@ -126,7 +131,7 @@ int anon_flag = 0;
 int sld_flag = 0;
 int nld_flag = 0;
 int promisc_flag = 1;
-AnonMap *Anons = NULL;
+ip_list_t *IgnoreList = NULL;
 int do_redraw = 1;
 
 /*
@@ -183,45 +188,185 @@ void report(void);
 typedef int Filter_t(unsigned short,
 	unsigned short,
 	const char *,
-	const struct in_addr,
-	const struct in_addr);
+	const struct in6_addr *,
+	const struct in6_addr *);
 Filter_t UnknownTldFilter;
 Filter_t AforAFilter;
 Filter_t RFC1918PtrFilter;
 Filter_t *Filter = NULL;
 
-struct in_addr
-AnonMap_lookup_or_add(AnonMap ** headP, struct in_addr real)
+#define s6_addr32 __u6_addr.__u6_addr32
+
+int cmp_in6_addr (const struct in6_addr *a,
+      const struct in6_addr *b)
+  {
+    int i;
+
+    for (i = 0; i < 4; i++)
+      if (a->s6_addr32[i] != b->s6_addr32[i])
+          break;
+
+    if (i >= 4)
+      return (0);
+
+    return (a->s6_addr32[i] > b->s6_addr32[i] ? 1 : -1);
+} /* int cmp_addrinfo */
+
+inline int ignore_list_match (const struct in6_addr *addr)
 {
-    AnonMap **T;
-    for (T = headP; (*T); T = &(*T)->next)
-	if ((*T)->real.s_addr == real.s_addr)
-	    return (*T)->anon;
-    (*T) = calloc(1, sizeof(**T));
-    (*T)->real = real;
-    (*T)->anon.s_addr = random();
-    return (*T)->anon;
+    ip_list_t *ptr;
+
+    for (ptr = IgnoreList; ptr != NULL; ptr = ptr->next)
+      if (cmp_in6_addr (addr, &ptr->addr) == 0)
+          return (1);
+    return (0);
+} /* int ignore_list_match */
+
+void ignore_list_add (const struct in6_addr *addr)
+{
+    ip_list_t *new;
+
+    if (ignore_list_match (addr) != 0)
+      return;
+
+    new = malloc (sizeof (ip_list_t));
+    if (new == NULL)
+    {
+      perror ("malloc");
+      return;
+    }
+
+    memcpy (&new->addr, addr, sizeof (struct in6_addr));
+    new->next = IgnoreList;
+
+    IgnoreList = new;
+} /* void ignore_list_add */
+
+void ignore_list_add_name (const char *name)
+{
+    struct addrinfo *ai_list;
+    struct addrinfo *ai_ptr;
+    struct in6_addr  addr;
+    int status;
+
+    status = getaddrinfo (name, NULL, NULL, &ai_list);
+    if (status != 0)
+      return;
+
+    for (ai_ptr = ai_list; ai_ptr != NULL; ai_ptr = ai_ptr->ai_next)
+    {
+      if (ai_ptr->ai_family == AF_INET)
+      {
+          addr.s6_addr32[0] = 0;
+          addr.s6_addr32[1] = 0;
+          addr.s6_addr32[2] = htonl (0x0000FFFF);
+          addr.s6_addr32[3] = ((struct sockaddr_in *) ai_ptr->ai_addr)->sin_addr.s_addr;
+
+          ignore_list_add (&addr);
+      }
+      else
+      {
+          ignore_list_add (&((struct sockaddr_in6 *) ai_ptr->ai_addr)->sin6_addr);
+      }
+    } /* for */
+
+    freeaddrinfo (ai_list);
 }
 
+void in6_addr_from_buffer (struct in6_addr *ia,
+      const void *buf, size_t buf_len,
+      int family)
+{
+    memset (ia, 0, sizeof (struct in6_addr));
+    if ((AF_INET == family) && (sizeof (uint32_t) == buf_len))
+    {
+      ia->s6_addr32[2] = htonl (0x0000FFFF);
+      ia->s6_addr32[3] = *((uint32_t *) buf);
+    }
+    else if ((AF_INET6 == family) && (sizeof (struct in6_addr) == buf_len))
+    {
+      memcpy (ia, buf, buf_len);
+    }
+}
+
+void
+allocate_anonymous_address (struct in6_addr *anon_addr,
+      const struct in6_addr *orig_addr)
+{
+    static ip_list_t *list = NULL;
+    static uint32_t next_num = 0;
+    ip_list_t *ptr;
+
+    memset (anon_addr, 0, sizeof (struct in6_addr));
+
+    for (ptr = list; ptr != NULL; ptr = ptr->next)
+    {
+      if (cmp_in6_addr (orig_addr, &ptr->addr) == 0)
+          break;
+    }
+
+    if (ptr == NULL)
+    {
+      ptr = (ip_list_t *) malloc (sizeof (ip_list_t) + sizeof (uint32_t));
+      if (ptr == NULL)
+          return;
+
+      ptr->addr = *orig_addr;
+      ptr->data = (void *) (ptr + 1);
+      *((uint32_t *) ptr->data) = next_num;
+      next_num++;
+
+      ptr->next = list;
+      list = ptr;
+    }
+
+    anon_addr->s6_addr32[3] = *((uint32_t *) ptr->data);
+  }
+  
 char *
-anon_inet_ntoa(struct in_addr a)
-{
-    if (anon_flag)
-	a = AnonMap_lookup_or_add(&Anons, a);
-    return inet_ntoa(a);
-}
+anon_inet_ntoa(const struct in6_addr *addr)
+  {
+    static char buffer[INET6_ADDRSTRLEN];
+    struct in6_addr anon_addr;
 
+      if (anon_flag)
+    {
+      allocate_anonymous_address (&anon_addr, addr);
+      addr = &anon_addr;
+    }
+
+    if ((addr->s6_addr32[0] == 0)
+          && (addr->s6_addr32[1] == 0)
+          && (addr->s6_addr32[2] == ntohl (0x0000FFFF)))
+    {
+      struct in_addr v4addr = { addr->s6_addr32[3] };
+
+      if (inet_ntop (AF_INET, (const void *) &v4addr,
+                  buffer, sizeof (buffer)) == NULL)
+          return (NULL);
+    }
+    else
+    {
+      if (inet_ntop (AF_INET6, (const void *) addr,
+                  buffer, sizeof (buffer)) == NULL)
+          return (NULL);
+    }
+
+    return (buffer);
+  }
+  
 AgentAddr *
-AgentAddr_lookup_or_add(hashtbl *tbl, struct in_addr a)
-{
-    AgentAddr *x = hash_find(&a, tbl);
+AgentAddr_lookup_or_add(hashtbl *tbl, struct in6_addr *addr)
+  {
+    AgentAddr *x = hash_find(addr, tbl);
     if (NULL == x) {
-	x = calloc(1, sizeof(*x));
-	x->src = a;
-	hash_add(&x->src, x, tbl);
+        x = calloc(1, sizeof(*x));
+        x->src = *addr;
+        hash_add(&x->src, x, tbl);
     }
     return x;
-}
+  }
+  
 
 static unsigned int
 string_hash(const void *s)
@@ -268,17 +413,17 @@ stringaddr_cmp(const void *a, const void *b)
 }
 
 StringAddrCounter *
-StringAddrCounter_lookup_or_add(hashtbl * tbl, struct in_addr a, const char *str)
+StringAddrCounter_lookup_or_add(hashtbl * tbl, const struct in6_addr *addr, const char *str)
 {
     StringAddr sa;
-    sa.addr = a;
+    sa.addr = *addr;
     sa.str = (char *) str;
     StringAddrCounter *x = hash_find(&sa, tbl);
     if (NULL == x) {
-	x = calloc(1, sizeof(*x));
-	x->straddr.str = strdup(str);
-	x->straddr.addr = a;
-	hash_add(&x->straddr, x, tbl);
+        x = calloc(1, sizeof(*x));
+        x->straddr.str = strdup(str);
+        x->straddr.addr = *addr;
+        hash_add(&x->straddr, x, tbl);
     }
     return x;
 }
@@ -392,7 +537,9 @@ QnameToNld(const char *qname, int nld)
 }
 
 int
-handle_dns(const char *buf, int len, const struct in_addr sip, const struct in_addr dip)
+handle_dns(const char *buf, int len,
+	const struct in6_addr *s_addr,
+	const struct in6_addr *d_addr)
 {
     rfc1035_header qh;
     unsigned short us;
@@ -453,7 +600,7 @@ handle_dns(const char *buf, int len, const struct in_addr sip, const struct in_a
     memcpy(&us, buf + offset + 2, 2);
     qclass = ntohs(us);
 
-    if (Filter && 0 == Filter(qtype, qclass, qname, sip, dip))
+    if (Filter && 0 == Filter(qtype, qclass, qname, s_addr, d_addr))
 	return 0;
 
     /* gather stats */
@@ -471,9 +618,8 @@ handle_dns(const char *buf, int len, const struct in_addr sip, const struct in_a
 	sc->count++;
 
 	/* increment StringAddrCounter */
-	ssc = StringAddrCounter_lookup_or_add(SSC2, sip, s);
+	ssc = StringAddrCounter_lookup_or_add(SSC2, s_addr, s);
 	ssc->count++;
-
     }
     if (nld_flag) {
 	s = QnameToNld(qname, 3);
@@ -481,43 +627,129 @@ handle_dns(const char *buf, int len, const struct in_addr sip, const struct in_a
 	sc->count++;
 
 	/* increment StringAddrCounter */
-	ssc = StringAddrCounter_lookup_or_add(SSC3, sip, s);
+	ssc = StringAddrCounter_lookup_or_add(SSC3, s_addr, s);
 	ssc->count++;
-
     }
     return 1;
 }
 
 int
-handle_udp(const struct udphdr *udp, int len, struct in_addr sip, struct in_addr dip)
+handle_udp(const struct udphdr *udp, int len,
+       const struct in6_addr *s_addr,
+       const struct in6_addr *d_addr)
 {
     char buf[PCAP_SNAPLEN];
     if (port53 != udp->uh_dport)
 	return 0;
     memcpy(buf, udp + 1, len - sizeof(*udp));
-    if (0 == handle_dns(buf, len - sizeof(*udp), sip, dip))
+    if (0 == handle_dns(buf, len - sizeof(*udp), s_addr, d_addr))
 	return 0;
     return 1;
 }
 
+  int
+handle_ipv6 (struct ip6_hdr *ipv6, int len)
+{
+    char buf[PCAP_SNAPLEN];
+    int offset;
+    int nexthdr;
+
+    struct in6_addr s_addr;
+    struct in6_addr d_addr;
+    uint16_t payload_len;
+
+    AgentAddr *agent;
+
+    offset = sizeof (struct ip6_hdr);
+    nexthdr = ipv6->ip6_nxt;
+    s_addr = ipv6->ip6_src;
+    d_addr = ipv6->ip6_dst;
+    payload_len = ntohs (ipv6->ip6_plen);
+
+    if (ignore_list_match (&s_addr))
+          return (0);
+
+    /* Parse extension headers. This only handles the standard headers, as
+     * defined in RFC 2460, correctly. Fragments are discarded. */
+    while ((IPPROTO_ROUTING == nexthdr) /* routing header */
+          || (IPPROTO_HOPOPTS == nexthdr) /* Hop-by-Hop options. */
+          || (IPPROTO_FRAGMENT == nexthdr) /* fragmentation header. */
+          || (IPPROTO_DSTOPTS == nexthdr) /* destination options. */
+          || (IPPROTO_DSTOPTS == nexthdr) /* destination options. */
+          || (IPPROTO_AH == nexthdr) /* destination options. */
+          || (IPPROTO_ESP == nexthdr)) /* encapsulating security payload. */
+    {
+      struct ip6_ext ext_hdr;
+      uint16_t ext_hdr_len;
+
+      /* Catch broken packets */
+      if ((offset + sizeof (struct ip6_ext)) > len)
+          return (0);
+
+      /* Cannot handle fragments. */
+      if (IPPROTO_FRAGMENT == nexthdr)
+          return (0);
+
+      memcpy (&ext_hdr, (char *) ipv6 + offset, sizeof (struct ip6_ext));
+      nexthdr = ext_hdr.ip6e_nxt;
+      ext_hdr_len = (8 * (ntohs (ext_hdr.ip6e_len) + 1));
+
+      /* This header is longer than the packets payload.. WTF? */
+      if (ext_hdr_len > payload_len)
+          return (0);
+
+      offset += ext_hdr_len;
+      payload_len -= ext_hdr_len;
+    } /* while */
+
+    /* Catch broken and empty packets */
+    if (((offset + payload_len) > len)
+          || (payload_len == 0)
+          || (payload_len > PCAP_SNAPLEN))
+      return (0);
+
+    if (IPPROTO_UDP != nexthdr)
+      return (0);
+
+    memcpy (buf, (char *) ipv6 + offset, payload_len);
+    if (handle_udp ((struct udphdr *) buf, payload_len, &s_addr, &d_addr) == 0)
+      return (0);
+
+    if ((agent = AgentAddr_lookup_or_add (Sources, &s_addr)) != NULL)
+      agent->count++;
+    if ((agent = AgentAddr_lookup_or_add (Destinations, &d_addr)) != NULL)
+      agent->count++;
+
+    return (1); /* Success */
+}
+
+
 int
-handle_ip(const struct ip *ip, int len)
+handle_ipv4(const struct ip *ip, int len)
 {
     char buf[PCAP_SNAPLEN];
     int offset = ip->ip_hl << 2;
     AgentAddr *clt;
     AgentAddr *srv;
-    if (ignore_addr.s_addr)
-	if (ip->ip_src.s_addr == ignore_addr.s_addr)
-	    return 0;
+     struct in6_addr s_addr;
+     struct in6_addr d_addr;
+ 
+     if (ip->ip_v == 6)
+       return (handle_ipv6 ((struct ip6_hdr *) ip, len));
+ 
+     in6_addr_from_buffer (&s_addr, &ip->ip_src.s_addr, sizeof (ip->ip_src.s_addr), AF_INET);
+     in6_addr_from_buffer (&d_addr, &ip->ip_dst.s_addr, sizeof (ip->ip_dst.s_addr), AF_INET);
+     if (ignore_list_match (&s_addr))
+           return (0);
+
     if (IPPROTO_UDP != ip->ip_p)
 	return 0;
     memcpy(buf, (void *) ip + offset, len - offset);
-    if (0 == handle_udp((struct udphdr *) buf, len - offset, ip->ip_src, ip->ip_dst))
-	return 0;
-    clt = AgentAddr_lookup_or_add(Sources, ip->ip_src);
-    clt->count++;
-    srv = AgentAddr_lookup_or_add(Destinations, ip->ip_dst);
+     if (0 == handle_udp((struct udphdr *) buf, len - offset, &s_addr, &d_addr))
+        return 0;
+     clt = AgentAddr_lookup_or_add(Sources, &s_addr);
+      clt->count++;
+     srv = AgentAddr_lookup_or_add(Destinations, &d_addr);
     srv->count++;
     return 1;
 }
@@ -550,7 +782,7 @@ handle_ppp(const u_char * pkt, int len)
     if (ETHERTYPE_IP != proto && PPP_IP != proto)
 	return 0;
     memcpy(buf, pkt, len);
-    return handle_ip((struct ip *) buf, len);
+    return handle_ipv4((struct ip *) buf, len);
 }
 
 #endif
@@ -562,7 +794,7 @@ handle_null(const u_char * pkt, int len)
     memcpy(&family, pkt, sizeof(family));
     if (AF_INET != family)
 	return 0;
-    return handle_ip((struct ip *) (pkt + 4), len - 4);
+    return handle_ipv4((struct ip *) (pkt + 4), len - 4);
 }
 
 #ifdef DLT_LOOP
@@ -573,7 +805,7 @@ handle_loop(const u_char * pkt, int len)
     memcpy(&family, pkt, sizeof(family));
     if (AF_INET != ntohl(family))
 	return 0;
-    return handle_ip((struct ip *) (pkt + 4), len - 4);
+    return handle_ipv4((struct ip *) (pkt + 4), len - 4);
 }
 
 #endif
@@ -582,7 +814,7 @@ handle_loop(const u_char * pkt, int len)
 int
 handle_raw(const u_char * pkt, int len)
 {
-    return handle_ip((struct ip *) pkt, len);
+    return handle_ipv4((struct ip *) pkt, len);
 }
 
 #endif
@@ -602,10 +834,13 @@ handle_ether(const u_char * pkt, int len)
 	pkt += 4;
 	len -= 4;
     }
-    if (ETHERTYPE_IP != etype)
+    if ((ETHERTYPE_IP != etype) && (ETHERTYPE_IPV6 != etype))
 	return 0;
     memcpy(buf, pkt, len);
-    return handle_ip((struct ip *) buf, len);
+    if (ETHERTYPE_IPV6 == etype)
+	return (handle_ipv6 ((struct ip6_hdr *) buf, len));
+    else
+	return handle_ipv4((struct ip *) buf, len);
 }
 
 void
@@ -934,12 +1169,12 @@ AgentAddr_report(hashtbl * tbl, const char *what)
     qsort(sortme, sortsize, sizeof(SortItem), SortItem_cmp);
 
     int nlines = get_nlines();
-    print_func("%-16s %9s %6s\n", what, "count", "%");
-    print_func("%-16s %9s %6s\n", "----------------", "---------", "------");
+    print_func("%-40s %9s %6s\n", what, "count", "%");
+    print_func("%-40s %9s %6s\n", "----------------", "---------", "------");
     for (i = 0; i<nlines && i<sortsize; i++) {
 	a = sortme[i].ptr;
-	print_func("%-16s %9d %6.1f\n",
-	    anon_inet_ntoa(a->src),
+	print_func("%-40s %9d %6.1f\n",
+	    anon_inet_ntoa(&a->src),
 	    a->count,
 	    100.0 * a->count / query_count_total);
     }
@@ -964,13 +1199,13 @@ StringAddrCounter_report(hashtbl * tbl, char *what1, char *what2)
     qsort(sortme, sortsize, sizeof(SortItem), SortItem_cmp);
 
     int nlines = get_nlines();
-    print_func("%-16s %-32s %9s %6s\n", what1, what2, "count", "%");
-    print_func("%-16s %-32s %9s %6s\n",
+    print_func("%-40s %-32s %9s %6s\n", what1, what2, "count", "%");
+    print_func("%-40s %-32s %9s %6s\n",
 	"----------------", "--------------------", "---------", "------");
     for (i = 0; i<nlines && i<sortsize; i++) {
 	ssc = sortme[i].ptr;
-	print_func("%-16s %-32s %9d %6.1f\n",
-	    anon_inet_ntoa(ssc->straddr.addr),
+	print_func("%-40s %-32s %9d %6.1f\n",
+	    anon_inet_ntoa(&ssc->straddr.addr),
 	    ssc->straddr.str,
 	    ssc->count,
 	    100.0 * ssc->count / query_count_total);
@@ -1036,7 +1271,9 @@ report(void)
 #include "known_tlds.h"
 
 int
-UnknownTldFilter(unsigned short qt, unsigned short qc, const char *qn, const struct in_addr sip, const struct in_addr dip)
+UnknownTldFilter(unsigned short qt, unsigned short qc, const char *qn,
+	const struct in6_addr *sip,
+	const struct in6_addr *dip)
 {
     const char *tld = QnameToNld(qn, 1);
     unsigned int i;
@@ -1049,7 +1286,9 @@ UnknownTldFilter(unsigned short qt, unsigned short qc, const char *qn, const str
 }
 
 int
-AforAFilter(unsigned short qt, unsigned short qc, const char *qn, const struct in_addr sip, const struct in_addr dip)
+AforAFilter(unsigned short qt, unsigned short qc, const char *qn,
+	const struct in6_addr *sip,
+	const struct in6_addr *dip)
 {
     struct in_addr a;
     if (qt != T_A)
@@ -1058,7 +1297,9 @@ AforAFilter(unsigned short qt, unsigned short qc, const char *qn, const struct i
 }
 
 int
-RFC1918PtrFilter(unsigned short qt, unsigned short qc, const char *qn, const struct in_addr sip, const struct in_addr dip)
+RFC1918PtrFilter(unsigned short qt, unsigned short qc, const char *qn,
+	const struct in6_addr *sip,
+	const struct in6_addr *dip)
 {
     char *t;
     char q[128];   
@@ -1188,7 +1429,6 @@ main(int argc, char *argv[])
 
     port53 = htons(53);
     SubReport = Sources_report;
-    ignore_addr.s_addr = 0;
     progname = strdup(strrchr(argv[0], '/') ? strchr(argv[0], '/') + 1 : argv[0]);
     srandom(time(NULL));
     ResetCounters();
@@ -1211,7 +1451,7 @@ main(int argc, char *argv[])
 	    bpf_program_str = strdup(optarg);
 	    break;
 	case 'i':
-	    ignore_addr.s_addr = inet_addr(optarg);
+	    ignore_list_add_name (optarg);
 	    break;
 	case 'f':
 	    set_filter(optarg);
