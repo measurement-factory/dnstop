@@ -119,7 +119,14 @@ typedef struct ip_list_s ip_list_t;
 
 char *device = NULL;
 pcap_t *pcap = NULL;
-char *bpf_program_str = "udp dst port 53 and udp[10:2] & 0x8000 = 0";
+/*
+ * bpf_program_str used to default to
+ *   udp dst port 53 and udp[10:2] & 0x8000 = 0
+ * but that didn't work so well with IPv6.  Now we have
+ * the command line options -Q and -R to choose counting queries,
+ * responses, or both.
+ */
+char *bpf_program_str = "udp port 53";
 WINDOW *w;
 static unsigned short port53;
 void (*SubReport) (void)= NULL;
@@ -132,6 +139,8 @@ int nld_flag = 0;
 int promisc_flag = 1;
 ip_list_t *IgnoreList = NULL;
 int do_redraw = 1;
+int opt_count_queries = 0;
+int opt_count_replies = 0;
 
 /*
  * flags/features for non-interactive mode
@@ -152,6 +161,8 @@ printer *print_func = (printer *) printw;
 
 int query_count_intvl = 0;
 int query_count_total = 0;
+int reply_count_intvl = 0;
+int reply_count_total = 0;
 int qtype_counts[T_MAX];
 int opcode_counts[OP_MAX];
 int qclass_counts[C_MAX];
@@ -562,6 +573,10 @@ handle_dns(const char *buf, int len,
     memcpy(&us, buf + 2, 2);
     us = ntohs(us);
     qh.qr = (us >> 15) & 0x01;
+    if (0 == qh.qr && 0 == opt_count_queries)
+	return 0;
+    if (1 == qh.qr && 0 == opt_count_replies)
+	return 0;
     qh.opcode = (us >> 11) & 0x0F;
     qh.aa = (us >> 10) & 0x01;
     qh.tc = (us >> 9) & 0x01;
@@ -630,6 +645,13 @@ handle_dns(const char *buf, int len,
 	ssc = StringAddrCounter_lookup_or_add(SSC3, s_addr, s);
 	ssc->count++;
     }
+    if (0 == qh.qr) {
+	query_count_intvl++;
+	query_count_total++;
+    } else {
+	reply_count_intvl++;
+	reply_count_total++;
+    }
     return 1;
 }
 
@@ -639,7 +661,7 @@ handle_udp(const struct udphdr *udp, int len,
     const struct in6_addr *d_addr)
 {
     char buf[PCAP_SNAPLEN];
-    if (port53 != udp->uh_dport)
+    if (port53 != udp->uh_dport && port53 != udp->uh_sport)
 	return 0;
     memcpy(buf, udp + 1, len - sizeof(*udp));
     if (0 == handle_dns(buf, len - sizeof(*udp), s_addr, d_addr))
@@ -851,8 +873,6 @@ handle_pcap(u_char * udata, const struct pcap_pkthdr *hdr, const u_char * pkt)
 	return;
     if (0 == handle_datalink(pkt, hdr->caplen))
 	return;
-    query_count_intvl++;
-    query_count_total++;
     last_ts = hdr->ts;
 }
 
@@ -866,6 +886,7 @@ void
 cron_post(void)
 {
     query_count_intvl = 0;
+    reply_count_intvl = 0;
 }
 
 void
@@ -1251,13 +1272,18 @@ Destinatioreport(void)
 void
 report(void)
 {
+    char tbuf[30];
     move(0, 0);
-    print_func("%d new queries, %d total queries",
+    print_func("Queries: %d new/%d total",
 	query_count_intvl, query_count_total);
+    move(0, 30);
+    print_func("Replies: %d new/%d total",
+	reply_count_intvl, reply_count_total);
     clrtoeol();
     time_t t = time(NULL);
-    move(0, 50);
-    print_func("%s", ctime(&t));
+    move(0, 60);
+    strftime(tbuf, 30, "%Y-%m-%d %T", localtime(&t));
+    print_func("%s", tbuf);
     move(2, 0);
     clrtobot();
     if (SubReport)
@@ -1434,7 +1460,7 @@ main(int argc, char *argv[])
     srandom(time(NULL));
     ResetCounters();
 
-    while ((x = getopt(argc, argv, "ab:f:i:pr:st")) != -1) {
+    while ((x = getopt(argc, argv, "ab:f:i:pr:stQR")) != -1) {
 	switch (x) {
 	case 'a':
 	    anon_flag = 1;
@@ -1460,6 +1486,12 @@ main(int argc, char *argv[])
 	case 'r':
 	    redraw_interval = atoi(optarg);
 	    break;
+	case 'Q':
+	    opt_count_queries = 1;
+	    break;
+	case 'R':
+	    opt_count_replies = 1;
+	    break;
 	default:
 	    usage();
 	    break;
@@ -1471,6 +1503,9 @@ main(int argc, char *argv[])
     if (argc < 1)
 	usage();
     device = strdup(argv[0]);
+
+    if (0 == opt_count_queries && 0 == opt_count_replies)
+	opt_count_queries = 1;
 
     if (0 == stat(device, &sb))
 	readfile_state = 1;
