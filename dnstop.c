@@ -1272,19 +1272,25 @@ Destinatioreport(void)
 void
 report(void)
 {
-    char tbuf[30];
-    move(0, 0);
-    print_func("Queries: %d new/%d tot",
-	query_count_intvl, query_count_total);
-    move(0, 30);
-    print_func("Replies: %d new/%d tot",
-	reply_count_intvl, reply_count_total);
-    clrtoeol();
+    int Y = 0;
+    move(Y, 0);
+    if (opt_count_queries) {
+        print_func("Queries: %d new, %d total",
+	    query_count_intvl, query_count_total);
+        clrtoeol();
+	Y++;
+    }
+    if (opt_count_replies) {
+	move(Y, 0);
+        print_func("Replies: %d new, %d total",
+	    reply_count_intvl, reply_count_total);
+        clrtoeol();
+	Y++;
+    }
     time_t t = time(NULL);
-    move(0, 60);
-    strftime(tbuf, 30, "%Y-%m-%d %T", localtime(&t));
-    print_func("%s", tbuf);
-    move(2, 0);
+    move(0, 50);
+    print_func("%s", ctime(&t));
+    move(Y+1, 0);
     clrtobot();
     if (SubReport)
 	SubReport();
