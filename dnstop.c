@@ -1096,7 +1096,7 @@ StringCounter_report(hashtbl * tbl, char *what)
 	print_func("%-30.30s %9d %6.1f\n",
 	    sc->s,
 	    sc->count,
-	    100.0 * sc->count / query_count_total);
+	    100.0 * sc->count / (query_count_total+reply_count_total));
     }
 
     free(sortme);
@@ -1149,7 +1149,7 @@ Qtypes_report(void)
 	print_func("%-10s %9d %6.1f\n",
 	    qtype_str(type),
 	    qtype_counts[type],
-	    100.0 * qtype_counts[type] / query_count_total);
+	    100.0 * qtype_counts[type] / (query_count_total+reply_count_total));
 	if (0 == --nlines)
 	    break;
     }
@@ -1168,7 +1168,7 @@ Opcodes_report(void)
 	print_func("%-10s %9d %6.1f\n",
 	    opcode_str(op),
 	    opcode_counts[op],
-	    100.0 * opcode_counts[op] / query_count_total);
+	    100.0 * opcode_counts[op] / (query_count_total+reply_count_total));
 	if (0 == --nlines)
 	    break;
     }
@@ -1198,7 +1198,7 @@ AgentAddr_report(hashtbl * tbl, const char *what)
 	print_func("%-40s %9d %6.1f\n",
 	    anon_inet_ntoa(&a->src),
 	    a->count,
-	    100.0 * a->count / query_count_total);
+	    100.0 * a->count / (query_count_total + reply_count_total));
     }
 
     free(sortme);
@@ -1230,7 +1230,7 @@ StringAddrCounter_report(hashtbl * tbl, char *what1, char *what2)
 	    anon_inet_ntoa(&ssc->straddr.addr),
 	    ssc->straddr.str,
 	    ssc->count,
-	    100.0 * ssc->count / query_count_total);
+	    100.0 * ssc->count / (query_count_total+reply_count_total));
     }
 }
 
@@ -1274,10 +1274,10 @@ report(void)
 {
     char tbuf[30];
     move(0, 0);
-    print_func("Queries: %d new/%d total",
+    print_func("Queries: %d new/%d tot",
 	query_count_intvl, query_count_total);
     move(0, 30);
-    print_func("Replies: %d new/%d total",
+    print_func("Replies: %d new/%d tot",
 	reply_count_intvl, reply_count_total);
     clrtoeol();
     time_t t = time(NULL);
