@@ -66,6 +66,7 @@ static hashfunc in_addr_hash;
 
 #ifdef __linux__
 #define uh_dport dest
+#define uh_sport source
 #endif
 
 typedef struct {
@@ -208,7 +209,12 @@ Filter_t AforAFilter;
 Filter_t RFC1918PtrFilter;
 Filter_t *Filter = NULL;
 
+#if defined(s6_addr32)
+#elif defined(__FreeBSD__)
 #define s6_addr32 __u6_addr.__u6_addr32
+#elif defined(__NetBSD__)
+#define s6_addr32 __u6_addr.__u6_addr32
+#endif
 
 int 
 cmp_in6_addr(const struct in6_addr *a,
