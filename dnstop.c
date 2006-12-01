@@ -141,6 +141,8 @@ ip_list_t *IgnoreList = NULL;
 int do_redraw = 1;
 int opt_count_queries = 0;
 int opt_count_replies = 0;
+int opt_count_ipv4 = 0;
+int opt_count_ipv6 = 0;
 
 /*
  * flags/features for non-interactive mode
@@ -682,6 +684,9 @@ handle_ipv6(struct ip6_hdr *ipv6, int len)
 
     AgentAddr *agent;
 
+    if (0 == opt_count_ipv6)
+	return 0;
+
     offset = sizeof(struct ip6_hdr);
     nexthdr = ipv6->ip6_nxt;
     s_addr = ipv6->ip6_src;
@@ -759,6 +764,9 @@ handle_ipv4(const struct ip *ip, int len)
 
     if (ip->ip_v == 6)
 	return (handle_ipv6((struct ip6_hdr *)ip, len));
+
+    if (0 == opt_count_ipv4)
+	return 0;
 
     in6_addr_from_buffer(&s_addr, &ip->ip_src.s_addr, sizeof(ip->ip_src.s_addr), AF_INET);
     in6_addr_from_buffer(&d_addr, &ip->ip_dst.s_addr, sizeof(ip->ip_dst.s_addr), AF_INET);
@@ -1466,8 +1474,14 @@ main(int argc, char *argv[])
     srandom(time(NULL));
     ResetCounters();
 
-    while ((x = getopt(argc, argv, "ab:f:i:pr:stQR")) != -1) {
+    while ((x = getopt(argc, argv, "46ab:f:i:pr:stQR")) != -1) {
 	switch (x) {
+	case '4':
+	    opt_count_ipv4 = 1;
+	    break;
+	case '6':
+	    opt_count_ipv6 = 1;
+	    break;
 	case 'a':
 	    anon_flag = 1;
 	    break;
@@ -1512,6 +1526,9 @@ main(int argc, char *argv[])
 
     if (0 == opt_count_queries && 0 == opt_count_replies)
 	opt_count_queries = 1;
+
+    if (0 == opt_count_ipv4 && 0 == opt_count_ipv6)
+	opt_count_ipv4 = opt_count_ipv6 = 1;
 
     if (0 == stat(device, &sb))
 	readfile_state = 1;
