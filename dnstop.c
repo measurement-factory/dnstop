@@ -64,7 +64,7 @@ static hashfunc in_addr_hash;
 #define PPP_CONTROL_VAL       0x03	/* The control byte value */
 #endif
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__GLIBC__) || defined(__GNU__)
 #define uh_dport dest
 #define uh_sport source
 #endif
