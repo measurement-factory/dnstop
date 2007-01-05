@@ -1,3 +1,13 @@
+2007/01/05 Misc Bugfixes
+
+    Some variables were declared in the middle of functions.  GCC
+    tolerates this, but other compilers (Solaris) do not.
+
+    Bug in switch statement.  break was before return (Bill Richter).
+
+    Added checks for "__GLIBC__" and "__GNU__" preprocessor symbols
+    for Linux compatibility (Petr Salinger).
+
 2006/12/01 Florian Forster and Duane Wessels
 
     Incorporated Florian's patch to support IPv6.  Both v4 and v6
