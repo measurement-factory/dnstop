@@ -1092,6 +1092,7 @@ StringCounter_report(hashtbl * tbl, char *what)
     int sortsize = hash_count(tbl);
     SortItem *sortme = calloc(sortsize, sizeof(SortItem));
     int i;
+    int nlines;
     StringCounter *sc;
     hash_iter_init(tbl);
     sortsize = 0;
@@ -1102,7 +1103,7 @@ StringCounter_report(hashtbl * tbl, char *what)
     }
     qsort(sortme, sortsize, sizeof(SortItem), SortItem_cmp);
 
-    int nlines = get_nlines();
+    nlines = get_nlines();
     print_func("%-30s %9s %6s\n", what, "count", "%");
     print_func("%-30s %9s %6s\n",
 	"------------------------------", "---------", "------");
@@ -1288,6 +1289,7 @@ void
 report(void)
 {
     int Y = 0;
+    time_t t;
     move(Y, 0);
     if (opt_count_queries) {
         print_func("Queries: %d new, %d total",
@@ -1302,7 +1304,7 @@ report(void)
         clrtoeol();
 	Y++;
     }
-    time_t t = time(NULL);
+    t = time(NULL);
     move(0, 50);
     print_func("%s", ctime(&t));
     move(Y+1, 0);
