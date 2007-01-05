@@ -433,9 +433,10 @@ StringAddrCounter *
 StringAddrCounter_lookup_or_add(hashtbl * tbl, const struct in6_addr *addr, const char *str)
 {
     StringAddr sa;
+    StringAddrCounter *x;
     sa.addr = *addr;
     sa.str = (char *)str;
-    StringAddrCounter *x = hash_find(&sa, tbl);
+    x = hash_find(&sa, tbl);
     if (NULL == x) {
 	x = calloc(1, sizeof(*x));
 	x->straddr.str = strdup(str);
