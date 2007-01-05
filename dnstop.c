@@ -513,8 +513,8 @@ rfc1035NameUnpack(const char *buf, size_t sz, off_t * off, char *name, size_t ns
 	    /*
 	     * "(The 10 and 01 combinations are reserved for future use.)"
 	     */
-	    break;
 	    return 3;
+	    break;
 	} else {
 	    (*off)++;
 	    len = (size_t) c;
