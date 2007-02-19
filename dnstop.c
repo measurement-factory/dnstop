@@ -895,6 +895,39 @@ handle_ether(const u_char * pkt, int len)
 	return handle_ipv4((struct ip *)buf, len);
 }
 
+#ifdef DLT_LINUX_SLL
+static int
+handle_linux_sll(const u_char * pkt, int len)
+{
+    struct sll_header {
+	uint16_t pkt_type;
+	uint16_t dev_type;
+	uint16_t addr_len;
+	uint8_t addr[8];
+	uint16_t proto_type;
+    }         *hdr;
+    uint16_t etype;
+
+    if (len < sizeof(struct sll_header))
+	return (0);
+
+    hdr = (struct sll_header *)pkt;
+    pkt = (u_char *) (hdr + 1);
+    len -= sizeof(struct sll_header);
+
+    etype = ntohs(hdr->proto_type);
+
+    if ((ETHERTYPE_IP != etype)
+	&& (ETHERTYPE_IPV6 != etype))
+	return 0;
+
+    if (ETHERTYPE_IPV6 == etype)
+	return (handle_ipv6((struct ip6_hdr *)pkt, len));
+    else
+	return handle_ipv4((struct ip *)pkt, len);
+}
+#endif				/* DLT_LINUX_SLL */
+
 void
 handle_pcap(u_char * udata, const struct pcap_pkthdr *hdr, const u_char * pkt)
 {
@@ -1609,6 +1642,11 @@ main(int argc, char *argv[])
 #ifdef DLT_RAW
     case DLT_RAW:
 	handle_datalink = handle_raw;
+	break;
+#endif
+#ifdef DLT_LINUX_SLL
+    case DLT_LINUX_SLL:
+	handle_datalink = handle_linux_sll;
 	break;
 #endif
     case DLT_NULL:
