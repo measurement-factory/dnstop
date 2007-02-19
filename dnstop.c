@@ -569,8 +569,8 @@ QnameToNld(const char *qname, int nld)
 
 int
 handle_dns(const char *buf, int len,
-    const struct in6_addr *s_addr,
-    const struct in6_addr *d_addr)
+    const struct in6_addr *src_addr,
+    const struct in6_addr *dst_addr)
 {
     rfc1035_header qh;
     unsigned short us;
@@ -635,7 +635,7 @@ handle_dns(const char *buf, int len,
     memcpy(&us, buf + offset + 2, 2);
     qclass = ntohs(us);
 
-    if (Filter && 0 == Filter(qtype, qclass, qname, s_addr, d_addr))
+    if (Filter && 0 == Filter(qtype, qclass, qname, src_addr, dst_addr))
 	return 0;
 
     /* gather stats */
@@ -653,7 +653,7 @@ handle_dns(const char *buf, int len,
 	sc->count++;
 
 	/* increment StringAddrCounter */
-	ssc = StringAddrCounter_lookup_or_add(SSC2, s_addr, s);
+	ssc = StringAddrCounter_lookup_or_add(SSC2, src_addr, s);
 	ssc->count++;
     }
     if (nld_flag) {
@@ -662,7 +662,7 @@ handle_dns(const char *buf, int len,
 	sc->count++;
 
 	/* increment StringAddrCounter */
-	ssc = StringAddrCounter_lookup_or_add(SSC3, s_addr, s);
+	ssc = StringAddrCounter_lookup_or_add(SSC3, src_addr, s);
 	ssc->count++;
     }
     if (0 == qh.qr) {
@@ -677,14 +677,14 @@ handle_dns(const char *buf, int len,
 
 int
 handle_udp(const struct udphdr *udp, int len,
-    const struct in6_addr *s_addr,
-    const struct in6_addr *d_addr)
+    const struct in6_addr *src_addr,
+    const struct in6_addr *dst_addr)
 {
     char buf[PCAP_SNAPLEN];
     if (port53 != udp->uh_dport && port53 != udp->uh_sport)
 	return 0;
     memcpy(buf, udp + 1, len - sizeof(*udp));
-    if (0 == handle_dns(buf, len - sizeof(*udp), s_addr, d_addr))
+    if (0 == handle_dns(buf, len - sizeof(*udp), src_addr, dst_addr))
 	return 0;
     return 1;
 }
@@ -696,8 +696,8 @@ handle_ipv6(struct ip6_hdr *ipv6, int len)
     int offset;
     int nexthdr;
 
-    struct in6_addr s_addr;
-    struct in6_addr d_addr;
+    struct in6_addr src_addr;
+    struct in6_addr dst_addr;
     uint16_t payload_len;
 
     AgentAddr *agent;
@@ -707,11 +707,11 @@ handle_ipv6(struct ip6_hdr *ipv6, int len)
 
     offset = sizeof(struct ip6_hdr);
     nexthdr = ipv6->ip6_nxt;
-    s_addr = ipv6->ip6_src;
-    d_addr = ipv6->ip6_dst;
+    src_addr = ipv6->ip6_src;
+    dst_addr = ipv6->ip6_dst;
     payload_len = ntohs(ipv6->ip6_plen);
 
-    if (ignore_list_match(&s_addr))
+    if (ignore_list_match(&src_addr))
 	return (0);
 
     /*
@@ -725,20 +725,23 @@ handle_ipv6(struct ip6_hdr *ipv6, int len)
 	||(IPPROTO_DSTOPTS == nexthdr)	/* destination options. */
 	||(IPPROTO_AH == nexthdr)	/* destination options. */
 	||(IPPROTO_ESP == nexthdr)) {	/* encapsulating security payload. */
-	struct ip6_ext ext_hdr;
+	struct {
+	    uint8_t nexthdr;
+	    uint8_t length;
+	}      ext_hdr;
 	uint16_t ext_hdr_len;
 
 	/* Catch broken packets */
-	if ((offset + sizeof(struct ip6_ext)) > len)
+	if ((offset + sizeof(ext_hdr)) > len)
 	    return (0);
 
 	/* Cannot handle fragments. */
 	if (IPPROTO_FRAGMENT == nexthdr)
 	    return (0);
 
-	memcpy(&ext_hdr, (char *)ipv6 + offset, sizeof(struct ip6_ext));
-	nexthdr = ext_hdr.ip6e_nxt;
-	ext_hdr_len = (8 * (ntohs(ext_hdr.ip6e_len) + 1));
+	memcpy(&ext_hdr, (char *)ipv6 + offset, sizeof(ext_hdr));
+	nexthdr = ext_hdr.nexthdr;
+	ext_hdr_len = (8 * (ntohs(ext_hdr.length) + 1));
 
 	/* This header is longer than the packets payload.. WTF? */
 	if (ext_hdr_len > payload_len)
@@ -758,12 +761,12 @@ handle_ipv6(struct ip6_hdr *ipv6, int len)
 	return (0);
 
     memcpy(buf, (char *)ipv6 + offset, payload_len);
-    if (handle_udp((struct udphdr *)buf, payload_len, &s_addr, &d_addr) == 0)
+    if (handle_udp((struct udphdr *)buf, payload_len, &src_addr, &dst_addr) == 0)
 	return (0);
 
-    if ((agent = AgentAddr_lookup_or_add(Sources, &s_addr)) != NULL)
+    if ((agent = AgentAddr_lookup_or_add(Sources, &src_addr)) != NULL)
 	agent->count++;
-    if ((agent = AgentAddr_lookup_or_add(Destinations, &d_addr)) != NULL)
+    if ((agent = AgentAddr_lookup_or_add(Destinations, &dst_addr)) != NULL)
 	agent->count++;
 
     return (1);			/* Success */
@@ -777,8 +780,8 @@ handle_ipv4(const struct ip *ip, int len)
     int offset = ip->ip_hl << 2;
     AgentAddr *clt;
     AgentAddr *srv;
-    struct in6_addr s_addr;
-    struct in6_addr d_addr;
+    struct in6_addr src_addr;
+    struct in6_addr dst_addr;
 
     if (ip->ip_v == 6)
 	return (handle_ipv6((struct ip6_hdr *)ip, len));
@@ -786,19 +789,19 @@ handle_ipv4(const struct ip *ip, int len)
     if (0 == opt_count_ipv4)
 	return 0;
 
-    in6_addr_from_buffer(&s_addr, &ip->ip_src.s_addr, sizeof(ip->ip_src.s_addr), AF_INET);
-    in6_addr_from_buffer(&d_addr, &ip->ip_dst.s_addr, sizeof(ip->ip_dst.s_addr), AF_INET);
-    if (ignore_list_match(&s_addr))
+    in6_addr_from_buffer(&src_addr, &ip->ip_src.s_addr, sizeof(ip->ip_src.s_addr), AF_INET);
+    in6_addr_from_buffer(&dst_addr, &ip->ip_dst.s_addr, sizeof(ip->ip_dst.s_addr), AF_INET);
+    if (ignore_list_match(&src_addr))
 	return (0);
 
     if (IPPROTO_UDP != ip->ip_p)
 	return 0;
     memcpy(buf, (void *)ip + offset, len - offset);
-    if (0 == handle_udp((struct udphdr *)buf, len - offset, &s_addr, &d_addr))
+    if (0 == handle_udp((struct udphdr *)buf, len - offset, &src_addr, &dst_addr))
 	return 0;
-    clt = AgentAddr_lookup_or_add(Sources, &s_addr);
+    clt = AgentAddr_lookup_or_add(Sources, &src_addr);
     clt->count++;
-    srv = AgentAddr_lookup_or_add(Destinations, &d_addr);
+    srv = AgentAddr_lookup_or_add(Destinations, &dst_addr);
     srv->count++;
     return 1;
 }
