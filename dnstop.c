@@ -1211,6 +1211,7 @@ AgentAddr_report(hashtbl * tbl, const char *what)
     int sortsize = hash_count(tbl);
     SortItem *sortme = calloc(sortsize, sizeof(SortItem));
     int i;
+    int nlines = get_nlines();
     AgentAddr *a;
     hash_iter_init(tbl);
     sortsize = 0;
@@ -1221,7 +1222,6 @@ AgentAddr_report(hashtbl * tbl, const char *what)
     }
     qsort(sortme, sortsize, sizeof(SortItem), SortItem_cmp);
 
-    int nlines = get_nlines();
     print_func("%-40s %9s %6s\n", what, "count", "%");
     print_func("%-40s %9s %6s\n", "----------------", "---------", "------");
     for (i = 0; i < nlines && i < sortsize; i++) {
@@ -1241,6 +1241,7 @@ StringAddrCounter_report(hashtbl * tbl, char *what1, char *what2)
     int sortsize = hash_count(tbl);
     SortItem *sortme = calloc(sortsize, sizeof(SortItem));
     int i;
+    int nlines = get_nlines();
     StringAddrCounter *ssc;
     hash_iter_init(tbl);
     sortsize = 0;
@@ -1251,7 +1252,6 @@ StringAddrCounter_report(hashtbl * tbl, char *what1, char *what2)
     }
     qsort(sortme, sortsize, sizeof(SortItem), SortItem_cmp);
 
-    int nlines = get_nlines();
     print_func("%-40s %-32s %9s %6s\n", what1, what2, "count", "%");
     print_func("%-40s %-32s %9s %6s\n",
 	"----------------", "--------------------", "---------", "------");
