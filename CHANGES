@@ -1,3 +1,8 @@
+2007/02/19 Dirk Jagdmann
+
+    Added USE_IP6 define so that v6-code can be disabled somewhat
+    easily.
+
 2007/02/19 Florian Forster
 
     Portability fixes for IPv6-related code as well as some Solaris
