@@ -536,7 +536,7 @@ rfc1035NameUnpack(const char *buf, size_t sz, off_t * off, char *name, size_t ns
 		len = ns - 1;
 	    if ((*off) + len > sz)
 		return 4;	/* message is too short */
-	    if (no + len > ns)
+	    if (no + len + 1 > ns)
 		return 5;	/* qname would overflow name buffer */
 	    memcpy(name + no, buf + (*off), len);
 	    (*off) += len;
