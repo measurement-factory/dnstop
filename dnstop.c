@@ -46,6 +46,7 @@ static hashfunc in_addr_hash;
 
 #define PCAP_SNAPLEN 1460
 #define MAX_QNAME_SZ 512
+#define DNS_MSG_HDR_SZ 12
 #ifndef ETHER_HDR_LEN
 #define ETHER_ADDR_LEN 6
 #define ETHER_TYPE_LEN 2
