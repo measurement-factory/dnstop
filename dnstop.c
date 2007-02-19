@@ -121,11 +121,12 @@ typedef struct ip_list_s ip_list_t;
 char *device = NULL;
 pcap_t *pcap = NULL;
 /*
- * bpf_program_str used to default to
- *   udp dst port 53 and udp[10:2] & 0x8000 = 0
- * but that didn't work so well with IPv6.  Now we have
- * the command line options -Q and -R to choose counting queries,
- * responses, or both.
+ * bpf_program_str used to default to:
+ * 
+ * udp dst port 53 and udp[10:2] & 0x8000 = 0
+ * 
+ * but that didn't work so well with IPv6.  Now we have the command line options
+ * -Q and -R to choose counting queries, responses, or both.
  */
 char *bpf_program_str = "udp port 53";
 WINDOW *w;
@@ -198,7 +199,7 @@ void Help_report(void);
 void ResetCounters(void);
 void report(void);
 
-typedef int 
+typedef int
 Filter_t(unsigned short,
     unsigned short,
     const char *,
@@ -216,7 +217,7 @@ Filter_t *Filter = NULL;
 #define s6_addr32 __u6_addr.__u6_addr32
 #endif
 
-int 
+int
 cmp_in6_addr(const struct in6_addr *a,
     const struct in6_addr *b)
 {
@@ -232,7 +233,7 @@ cmp_in6_addr(const struct in6_addr *a,
     return (a->s6_addr32[i] > b->s6_addr32[i] ? 1 : -1);
 }				/* int cmp_addrinfo */
 
-inline int 
+inline int
 ignore_list_match(const struct in6_addr *addr)
 {
     ip_list_t *ptr;
@@ -243,7 +244,7 @@ ignore_list_match(const struct in6_addr *addr)
     return (0);
 }				/* int ignore_list_match */
 
-void 
+void
 ignore_list_add(const struct in6_addr *addr)
 {
     ip_list_t *new;
@@ -262,7 +263,7 @@ ignore_list_add(const struct in6_addr *addr)
     IgnoreList = new;
 }				/* void ignore_list_add */
 
-void 
+void
 ignore_list_add_name(const char *name)
 {
     struct addrinfo *ai_list;
@@ -290,7 +291,7 @@ ignore_list_add_name(const char *name)
     freeaddrinfo(ai_list);
 }
 
-void 
+void
 in6_addr_from_buffer(struct in6_addr *ia,
     const void *buf, size_t buf_len,
     int family)
@@ -338,13 +339,13 @@ allocate_anonymous_address(struct in6_addr *anon_addr,
 int
 is_v4_in_v6(const struct in6_addr *addr)
 {
-	if (addr->s6_addr32[0])
-		return 0;
-	if (addr->s6_addr32[1])
-		return 0;
-	if (addr->s6_addr32[2] != ntohl(0x0000FFFF))
-		return 0;
-	return 1;
+    if (addr->s6_addr32[0])
+	return 0;
+    if (addr->s6_addr32[1])
+	return 0;
+    if (addr->s6_addr32[2] != ntohl(0x0000FFFF))
+	return 0;
+    return 1;
 }
 
 char *
@@ -466,8 +467,8 @@ static unsigned int
 in_addr_hash(const void *key)
 {
     if (is_v4_in_v6(key))
-    	return SuperFastHash(key+12, 4);
-   return SuperFastHash(key, 16);
+	return SuperFastHash(key + 12, 4);
+    return SuperFastHash(key, 16);
 }
 
 static int
@@ -1112,7 +1113,7 @@ StringCounter_report(hashtbl * tbl, char *what)
 	print_func("%-30.30s %9d %6.1f\n",
 	    sc->s,
 	    sc->count,
-	    100.0 * sc->count / (query_count_total+reply_count_total));
+	    100.0 * sc->count / (query_count_total + reply_count_total));
     }
 
     free(sortme);
@@ -1165,7 +1166,7 @@ Qtypes_report(void)
 	print_func("%-10s %9d %6.1f\n",
 	    qtype_str(type),
 	    qtype_counts[type],
-	    100.0 * qtype_counts[type] / (query_count_total+reply_count_total));
+	    100.0 * qtype_counts[type] / (query_count_total + reply_count_total));
 	if (0 == --nlines)
 	    break;
     }
@@ -1184,7 +1185,7 @@ Opcodes_report(void)
 	print_func("%-10s %9d %6.1f\n",
 	    opcode_str(op),
 	    opcode_counts[op],
-	    100.0 * opcode_counts[op] / (query_count_total+reply_count_total));
+	    100.0 * opcode_counts[op] / (query_count_total + reply_count_total));
 	if (0 == --nlines)
 	    break;
     }
@@ -1246,7 +1247,7 @@ StringAddrCounter_report(hashtbl * tbl, char *what1, char *what2)
 	    anon_inet_ntoa(&ssc->straddr.addr),
 	    ssc->straddr.str,
 	    ssc->count,
-	    100.0 * ssc->count / (query_count_total+reply_count_total));
+	    100.0 * ssc->count / (query_count_total + reply_count_total));
     }
 }
 
@@ -1292,22 +1293,22 @@ report(void)
     time_t t;
     move(Y, 0);
     if (opt_count_queries) {
-        print_func("Queries: %d new, %d total",
+	print_func("Queries: %d new, %d total",
 	    query_count_intvl, query_count_total);
-        clrtoeol();
+	clrtoeol();
 	Y++;
     }
     if (opt_count_replies) {
 	move(Y, 0);
-        print_func("Replies: %d new, %d total",
+	print_func("Replies: %d new, %d total",
 	    reply_count_intvl, reply_count_total);
-        clrtoeol();
+	clrtoeol();
 	Y++;
     }
     t = time(NULL);
     move(0, 50);
     print_func("%s", ctime(&t));
-    move(Y+1, 0);
+    move(Y + 1, 0);
     clrtobot();
     if (SubReport)
 	SubReport();
