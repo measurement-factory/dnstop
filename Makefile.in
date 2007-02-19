@@ -11,6 +11,9 @@ SRCS=	$(PROG).c \
 OBJS=	$(PROG).o \
 	hashtbl.o
 
+PREFIX=	/usr/local
+
+
 # You may need to uncomment this, esp on Solaris
 XTRALIBS= # -lnsl -lresolv -lsocket
 
@@ -29,3 +32,11 @@ tar:
 	chmod 444 $(PROG)-$(DATE).tar.gz
 	rm -rf $(PROG)-$(DATE)
 	md5 *.gz > MD5s.txt
+
+install: $(PROG)
+	install -m 755 $(PROG) $(PREFIX)/bin
+	install -m 644 dnstop.8 $(PREFIX)/man/man8
+
+uninstall:
+	rm -f $(PREFIX)/bin/$(PROG) $(PREFIX)/man/man8/dnstop.8
+
