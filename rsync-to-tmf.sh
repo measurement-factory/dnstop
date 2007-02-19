@@ -7,6 +7,8 @@ Makefile
 dnstop.8
 dnstop.c
 known_tlds.h
+hashtbl.c
+hashtbl.h
 "
 
 chmod a+r $FILES
