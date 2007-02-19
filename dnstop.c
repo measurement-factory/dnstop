@@ -689,6 +689,7 @@ handle_udp(const struct udphdr *udp, int len,
     return 1;
 }
 
+#if USE_IPV6
 int
 handle_ipv6(struct ip6_hdr *ipv6, int len)
 {
@@ -771,6 +772,7 @@ handle_ipv6(struct ip6_hdr *ipv6, int len)
 
     return (1);			/* Success */
 }
+#endif
 
 
 int
@@ -783,8 +785,10 @@ handle_ipv4(const struct ip *ip, int len)
     struct in6_addr src_addr;
     struct in6_addr dst_addr;
 
+#if USE_IPV6
     if (ip->ip_v == 6)
 	return (handle_ipv6((struct ip6_hdr *)ip, len));
+#endif
 
     if (0 == opt_count_ipv4)
 	return 0;
@@ -872,9 +876,25 @@ handle_raw(const u_char * pkt, int len)
 #endif
 
 int
-handle_ether(const u_char * pkt, int len)
+handle_ip(const u_char * pkt, int len, unsigned short etype)
 {
     char buf[PCAP_SNAPLEN];
+#if USE_IPV6
+    if (ETHERTYPE_IPV6 == etype) {
+	memcpy(buf, pkt, len);
+	return (handle_ipv6((struct ip6_hdr *)buf, len));
+    } else
+#endif
+    if (ETHERTYPE_IP == etype) {
+	memcpy(buf, pkt, len);
+	return handle_ipv4((struct ip *)buf, len);
+    }
+    return 0;
+}
+
+int
+handle_ether(const u_char * pkt, int len)
+{
     struct ether_header *e = (void *)pkt;
     unsigned short etype = ntohs(e->ether_type);
     if (len < ETHER_HDR_LEN)
@@ -886,13 +906,7 @@ handle_ether(const u_char * pkt, int len)
 	pkt += 4;
 	len -= 4;
     }
-    if ((ETHERTYPE_IP != etype) && (ETHERTYPE_IPV6 != etype))
-	return 0;
-    memcpy(buf, pkt, len);
-    if (ETHERTYPE_IPV6 == etype)
-	return (handle_ipv6((struct ip6_hdr *)buf, len));
-    else
-	return handle_ipv4((struct ip *)buf, len);
+    return handle_ip(pkt, len, etype);
 }
 
 #ifdef DLT_LINUX_SLL
@@ -916,15 +930,7 @@ handle_linux_sll(const u_char * pkt, int len)
     len -= sizeof(struct sll_header);
 
     etype = ntohs(hdr->proto_type);
-
-    if ((ETHERTYPE_IP != etype)
-	&& (ETHERTYPE_IPV6 != etype))
-	return 0;
-
-    if (ETHERTYPE_IPV6 == etype)
-	return (handle_ipv6((struct ip6_hdr *)pkt, len));
-    else
-	return handle_ipv4((struct ip *)pkt, len);
+    return handle_ip(pkt, len, etype);
 }
 #endif				/* DLT_LINUX_SLL */
 

@@ -1,3 +1,17 @@
+2007/02/19 Florian Forster
+
+    Portability fixes for IPv6-related code as well as some Solaris
+    and Linux quirks.
+
+2007/02/19 Duane Wessels
+
+    Updated rfc1035NameUnpack() and fixed a buffer overflow bug.
+
+2007/02/19 Tom moof Spindler
+
+    There's two more occurences of c99ish "declare local vars in
+    the middle of a block".
+
 2007/01/05 Misc Bugfixes
 
     Some variables were declared in the middle of functions.  GCC
