@@ -211,27 +211,22 @@ Filter_t AforAFilter;
 Filter_t RFC1918PtrFilter;
 Filter_t *Filter = NULL;
 
-#if defined(s6_addr32)
-#elif defined(__FreeBSD__)
-#define s6_addr32 __u6_addr.__u6_addr32
-#elif defined(__NetBSD__)
-#define s6_addr32 __u6_addr.__u6_addr32
-#endif
-
 int
 cmp_in6_addr(const struct in6_addr *a,
     const struct in6_addr *b)
 {
     int i;
 
-    for (i = 0; i < 4; i++)
-	if (a->s6_addr32[i] != b->s6_addr32[i])
+    assert(sizeof(struct in6_addr) == 16);
+
+    for (i = 0; i < 16; i++)
+	if (a->s6_addr[i] != b->s6_addr[i])
 	    break;
 
-    if (i >= 4)
+    if (i >= 16)
 	return (0);
 
-    return (a->s6_addr32[i] > b->s6_addr32[i] ? 1 : -1);
+    return (a->s6_addr[i] > b->s6_addr[i] ? 1 : -1);
 }				/* int cmp_addrinfo */
 
 inline int
@@ -278,10 +273,10 @@ ignore_list_add_name(const char *name)
 
     for (ai_ptr = ai_list; ai_ptr != NULL; ai_ptr = ai_ptr->ai_next) {
 	if (ai_ptr->ai_family == AF_INET) {
-	    addr.s6_addr32[0] = 0;
-	    addr.s6_addr32[1] = 0;
-	    addr.s6_addr32[2] = htonl(0x0000FFFF);
-	    addr.s6_addr32[3] = ((struct sockaddr_in *)ai_ptr->ai_addr)->sin_addr.s_addr;
+	    memset(&addr, '\0', sizeof(addr));
+	    addr.s6_addr[10] = 0xFF;
+	    addr.s6_addr[11] = 0xFF;
+	    memcpy(addr.s6_addr + 12, &((struct sockaddr_in *)ai_ptr->ai_addr)->sin_addr, 4);
 
 	    ignore_list_add(&addr);
 	} else {
@@ -299,8 +294,9 @@ in6_addr_from_buffer(struct in6_addr *ia,
 {
     memset(ia, 0, sizeof(struct in6_addr));
     if ((AF_INET == family) && (sizeof(uint32_t) == buf_len)) {
-	ia->s6_addr32[2] = htonl(0x0000FFFF);
-	ia->s6_addr32[3] = *((uint32_t *) buf);
+	ia->s6_addr[10] = 0xFF;
+	ia->s6_addr[11] = 0xFF;
+	memcpy(ia->s6_addr + 12, buf, buf_len);
     } else if ((AF_INET6 == family) && (sizeof(struct in6_addr) == buf_len)) {
 	memcpy(ia, buf, buf_len);
     }
@@ -334,18 +330,18 @@ allocate_anonymous_address(struct in6_addr *anon_addr,
 	ptr->next = list;
 	list = ptr;
     }
-    anon_addr->s6_addr32[3] = *((uint32_t *) ptr->data);
+    memcpy(anon_addr->s6_addr + 12, ptr->data, 4);
 }
 
 int
 is_v4_in_v6(const struct in6_addr *addr)
 {
-    if (addr->s6_addr32[0])
-	return 0;
-    if (addr->s6_addr32[1])
-	return 0;
-    if (addr->s6_addr32[2] != ntohl(0x0000FFFF))
-	return 0;
+    int i;
+    for (i = 0; i < 10; i++)
+	if (addr->s6_addr[i] != 0)
+	    return (0);
+    if ((addr->s6_addr[10] != 0xFF) || (addr->s6_addr[11] != 0xFF))
+	return (0);
     return 1;
 }
 
@@ -360,8 +356,8 @@ anon_inet_ntoa(const struct in6_addr *addr)
 	addr = &anon_addr;
     }
     if (is_v4_in_v6(addr)) {
-	struct in_addr v4addr = {addr->s6_addr32[3]};
-
+	struct in_addr v4addr;
+	memcpy(&v4addr.s_addr, addr->s6_addr + 12, 4);
 	if (inet_ntop(AF_INET, (const void *)&v4addr,
 		buffer, sizeof(buffer)) == NULL)
 	    return (NULL);
