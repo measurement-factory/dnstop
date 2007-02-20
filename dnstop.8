@@ -46,10 +46,17 @@ ignore select addresses
 Do not put the interface into promiscuous mode.
 .It Fl r
 Redraw interval (seconds).
-.It Fl s
-collect second-level domain statistics
-.It Fl t
-collect third-level domain statistics
+.It Fl l Ar level
+keep counts on names up to
+.Pa level
+domain name levels.
+.Pp
+For example, with -l 2 (the default),
+.Nm
+will keep two tables: one with top-level domain names, and another
+with second-level domain names.  Increasing the
+.Pa level
+provides more details, but also requires more memory and CPU.
 .\"
 .It Fl f
 input filter name
@@ -95,15 +102,41 @@ display the breakdown of query types seen
 .It o
 display the breakdown of opcodes seen
 .It 1
-show the TLD table
+show 1st level query names
 .It 2
-show the SLD table
+show 2nd level query names
 .It 3
-show the 3LD table
+show 3rd level query names
+.It 4
+show 4th level query names
+.It 5
+show 5th level query names
+.It 6
+show 6th level query names
+.It 7
+show 7th level query names
+.It 8
+show 8th level query names
+.It 9
+show 9th level query names
+.It !
+show sources + 1st level query names
 .It @
-show the SLD+source table
+show sources + 2nd level query names
 .It #
-show the 3LD+source table
+show sources + 3rd level query names
+.It $
+show sources + 4th level query names
+.It %
+show sources + 5th level query names
+.It ^
+show sources + 6th level query names
+.It &
+show sources + 7th level query names
+.It *
+show sources + 8th level query names
+.It (
+show sources + 9th level query names
 .It ^R
 reset the counters
 .It ^X

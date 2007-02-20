@@ -1,4 +1,4 @@
-CFLAGS=-g -Wall -DUSE_IPV6=1
+CFLAGS=-g -Wall -DUSE_IPV6=1 -DUSE_PPP=0
 PROG=dnstop
 DATE != date +%Y%m%d
 CC=gcc

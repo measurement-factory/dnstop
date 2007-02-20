@@ -1,3 +1,24 @@
+2007/02/20 Duane Wessels
+
+    Internal redesign.  Removed the data structures for storing
+    1st, 2nd, and 3rd level query name stats and replaced them with
+    an array supporting collection of up to 9 domain components.
+    Replaced the -2 and -3 command line options with -l N where N
+    is a number from 1 to 9.  Higher values of N give more details
+    but also use more memory and CPU.
+
+    Rewrote the display code.  Columns are now sized automatically
+    depending on the width of the values being displayed, and the
+    maximum width of the terminal.
+
+2007/02/20 Duane Wessels
+
+    Bugfix: The combined "sources + queryname" tables were counting
+    incorrectly due to the use of in_addr_cmp() in the hash table
+    comparison function.  We no longer store IP addresses as struct
+    in_addr.  We store them as IPv6 addresses and the comparison function
+    always returned 0 for v4 addrs.
+
 2007/02/19 Florian Forster
 
     Arithmetic on void pointers is not well defined and Solaris

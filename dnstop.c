@@ -85,7 +85,7 @@ typedef struct {
     char *str;
 }      StringAddr;
 
-/* This struct cobbles together Source and Sld */
+/* This struct cobbles together Source and Nld */
 typedef struct {
     StringAddr straddr;
     int count;
@@ -137,8 +137,8 @@ int (*handle_datalink) (const u_char * pkt, int len)= NULL;
 int Quit = 0;
 char *progname = NULL;
 int anon_flag = 0;
-int sld_flag = 0;
-int nld_flag = 0;
+int max_level = 2;
+int cur_level = 1;
 int promisc_flag = 1;
 ip_list_t *IgnoreList = NULL;
 int do_redraw = 1;
@@ -153,6 +153,8 @@ int opt_count_ipv6 = 0;
 int interactive = 1;
 typedef int (printer) (const char *,...);
 printer *print_func = (printer *) printw;
+
+typedef const char *(col_fmt) (const SortItem *);
 
 #define T_MAX 65536
 #ifndef T_A6
@@ -173,11 +175,8 @@ int opcode_counts[OP_MAX];
 int qclass_counts[C_MAX];
 hashtbl *Sources = NULL;
 hashtbl *Destinations = NULL;
-hashtbl *Tlds = NULL;
-hashtbl *Slds = NULL;
-hashtbl *Nlds = NULL;
-hashtbl *SSC2 = NULL;
-hashtbl *SSC3 = NULL;
+hashtbl *Domains[10];
+hashtbl *DomSrcs[10];
 #ifdef __OpenBSD__
 struct bpf_timeval last_ts;
 #else
@@ -187,15 +186,12 @@ time_t report_interval = 1;
 
 
 /* Prototypes */
-void SldBySource_report(void);
-void NldBySource_report(void);
 void Sources_report(void);
 void Destinatioreport(void);
 void Qtypes_report(void);
 void Opcodes_report(void);
-void Tld_report(void);
-void Sld_report(void);
-void Nld_report(void);
+void Domain_report();
+void DomSrc_report();
 void Help_report(void);
 void ResetCounters(void);
 void report(void);
@@ -572,6 +568,7 @@ handle_dns(const char *buf, int len,
     int x;
     StringCounter *sc;
     StringAddrCounter *ssc;
+    int lvl;
 
     if (len < sizeof(qh))
 	return 0;
@@ -632,28 +629,14 @@ handle_dns(const char *buf, int len,
     qclass_counts[qclass]++;
     opcode_counts[qh.opcode]++;
 
-    s = QnameToNld(qname, 1);
-    sc = StringCounter_lookup_or_add(Tlds, s);
-    sc->count++;
-
-    if (sld_flag) {
-	s = QnameToNld(qname, 2);
-	sc = StringCounter_lookup_or_add(Slds, s);
+    for (lvl = 1; lvl <= max_level; lvl++) {
+	s = QnameToNld(qname, lvl);
+	sc = StringCounter_lookup_or_add(Domains[lvl], s);
 	sc->count++;
-
-	/* increment StringAddrCounter */
-	ssc = StringAddrCounter_lookup_or_add(SSC2, src_addr, s);
+	ssc = StringAddrCounter_lookup_or_add(DomSrcs[lvl], src_addr, s);
 	ssc->count++;
     }
-    if (nld_flag) {
-	s = QnameToNld(qname, 3);
-	sc = StringCounter_lookup_or_add(Nlds, s);
-	sc->count++;
 
-	/* increment StringAddrCounter */
-	ssc = StringAddrCounter_lookup_or_add(SSC3, src_addr, s);
-	ssc->count++;
-    }
     if (0 == qh.qr) {
 	query_count_intvl++;
 	query_count_total++;
@@ -979,20 +962,53 @@ keyboard(void)
 	SubReport = Destinatioreport;
 	break;
     case '1':
-	SubReport = Tld_report;
-	break;
     case '2':
-	SubReport = Sld_report;
-	break;
     case '3':
-	SubReport = Nld_report;
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+    case '8':
+    case '9':
+	SubReport = Domain_report;
+	cur_level = ch - '0';
+	break;
+    case '!':
+	SubReport = DomSrc_report;
+	cur_level = 1;
 	break;
     case 'c':
     case '@':
-	SubReport = SldBySource_report;
+	SubReport = DomSrc_report;
+	cur_level = 2;
 	break;
     case '#':
-	SubReport = NldBySource_report;
+	SubReport = DomSrc_report;
+	cur_level = 3;
+	break;
+    case '$':
+	SubReport = DomSrc_report;
+	cur_level = 4;
+	break;
+    case '%':
+	SubReport = DomSrc_report;
+	cur_level = 5;
+	break;
+    case '^':
+	SubReport = DomSrc_report;
+	cur_level = 6;
+	break;
+    case '&':
+	SubReport = DomSrc_report;
+	cur_level = 7;
+	break;
+    case '*':
+	SubReport = DomSrc_report;
+	cur_level = 8;
+	break;
+    case '(':
+	SubReport = DomSrc_report;
+	cur_level = 9;
 	break;
     case 't':
 	SubReport = Qtypes_report;
@@ -1031,15 +1047,28 @@ Help_report(void)
     print_func(" d - Destinations list\n");
     print_func(" t - Query types\n");
     print_func(" o - Opcodes\n");
-    print_func(" 1 - TLD list\n");
-    print_func(" 2 - SLD list\n");
-    print_func(" 3 - 3LD list\n");
-    print_func(" @ - SLD+Sources list\n");
-    print_func(" # - 3LD+Sources list\n");
+    print_func(" 1 - 1st level Query Names"
+	"\t! - with Sources\n");
+    print_func(" 2 - 2nd level Query Names"
+	"\t@ - with Sources\n");
+    print_func(" 3 - 3rd level Query Names"
+	"\t# - with Sources\n");
+    print_func(" 4 - 4th level Query Names"
+	"\t$ - with Sources\n");
+    print_func(" 5 - 5th level Query Names"
+	"\t%% - with Sources\n");
+    print_func(" 6 - 6th level Query Names"
+	"\t^ - with Sources\n");
+    print_func(" 7 - 7th level Query Names"
+	"\t& - with Sources\n");
+    print_func(" 8 - 8th level Query Names"
+	"\t* - with Sources\n");
+    print_func(" 9 - 9th level Query Names"
+	"\t( - with Sources\n");
     print_func("^R - Reset counters\n");
     print_func("^X - Exit\n");
     print_func("\n");
-    print_func("? - this\n");
+    print_func(" ? - this\n");
 }
 
 char *
@@ -1132,13 +1161,99 @@ get_nlines(void)
 	return 50;
 }
 
+int
+get_ncols(void)
+{
+    if (interactive)
+	return getmaxx(w);
+    else
+	return 80;
+}
+
+const char *
+StringCounter_col_fmt(const SortItem * si)
+{
+    StringCounter *sc = si->ptr;
+    return sc->s;
+}
+
+const char *
+dashes(int n)
+{
+    static char *buf = "-----------------------------------------------"
+    "-----------------------------------------------------------------"
+    "-----------------------------------------------------------------"
+    "-----------------------------------------------------------------"
+    "-----------------------------------------------------------------"
+    "-----------------------------------------------------------------";
+    return &buf[strlen(buf) - n];
+}
+
+void
+Table_report(SortItem * sorted, int rows, const char *col1, const char *col2, col_fmt F1, col_fmt F2, int base)
+{
+    int W1 = strlen(col1);
+    int W2 = col2 ? strlen(col2) : 0;
+    int WC = 9;			/* width of "Count" column */
+    int WP = 6;			/* width of "Percent" column */
+    int i;
+    int nlines = get_nlines();
+    int ncols = get_ncols();
+    char fmt1[64];
+    char fmt2[64];
+
+    if (nlines > rows)
+	nlines = rows;
+
+    for (i = 0; i < nlines; i++) {
+	const char *t = F1(sorted + i);
+	if (W1 < strlen(t))
+	    W1 = strlen(t);
+    }
+    if (W1 + 1 + WC + 1 + WP + 1 > ncols)
+	W1 = ncols - 1 - WC - 1 - WP - 1;
+
+    if (NULL == col2 || NULL == F2) {
+	snprintf(fmt1, 64, "%%-%d.%ds %%%ds %%%ds\n", W1, W1, WC, WP);
+	snprintf(fmt2, 64, "%%-%d.%ds %%%dd %%%d.1f\n", W1, W1, WC, WP);
+	print_func(fmt1, col1, "Count", "%");
+	print_func(fmt1, dashes(W1), dashes(WC), dashes(WP));
+	for (i = 0; i < nlines; i++) {
+	    const char *t = F1(sorted + i);
+	    print_func(fmt2,
+		t,
+		(sorted + i)->cnt,
+		100.0 * (sorted + i)->cnt / base);
+	}
+    } else {
+	for (i = 0; i < nlines; i++) {
+	    const char *t = F2(sorted + i);
+	    if (W2 < strlen(t))
+		W2 = strlen(t);
+	}
+	if (W2 + 1 + W1 + 1 + WC + 1 + WP + 1 > ncols)
+	    W2 = ncols - 1 - W1 - 1 - WC - 1 - WP - 1;
+	snprintf(fmt1, 64, "%%-%d.%ds %%-%d.%ds %%%ds %%%ds\n", W1, W1, W2, W2, WC, WP);
+	snprintf(fmt2, 64, "%%-%d.%ds %%-%d.%ds %%%dd %%%d.1f\n", W1, W1, W2, W2, WC, WP);
+	print_func(fmt1, col1, col2, "Count", "%");
+	print_func(fmt1, dashes(W1), dashes(W2), dashes(WC), dashes(WP));
+	for (i = 0; i < nlines; i++) {
+	    const char *t = F1(sorted + i);
+	    const char *q = F2(sorted + i);
+	    print_func(fmt2,
+		t,
+		q,
+		(sorted + i)->cnt,
+		100.0 * (sorted + i)->cnt / base);
+	}
+    }
+}
+
 void
 StringCounter_report(hashtbl * tbl, char *what)
 {
     int sortsize = hash_count(tbl);
     SortItem *sortme = calloc(sortsize, sizeof(SortItem));
-    int i;
-    int nlines;
     StringCounter *sc;
     hash_iter_init(tbl);
     sortsize = 0;
@@ -1148,19 +1263,10 @@ StringCounter_report(hashtbl * tbl, char *what)
 	sortsize++;
     }
     qsort(sortme, sortsize, sizeof(SortItem), SortItem_cmp);
-
-    nlines = get_nlines();
-    print_func("%-30s %9s %6s\n", what, "count", "%");
-    print_func("%-30s %9s %6s\n",
-	"------------------------------", "---------", "------");
-    for (i = 0; i < nlines && i < sortsize; i++) {
-	sc = sortme[i].ptr;
-	print_func("%-30.30s %9d %6.1f\n",
-	    sc->s,
-	    sc->count,
-	    100.0 * sc->count / (query_count_total + reply_count_total));
-    }
-
+    Table_report(sortme, sortsize,
+	what, NULL,
+	StringCounter_col_fmt, NULL,
+	query_count_total + reply_count_total);
     free(sortme);
 }
 
@@ -1172,68 +1278,68 @@ StringAddrCounter_free(void *p)
 }
 
 void
-Tld_report(void)
+Domain_report(void)
 {
-    StringCounter_report(Tlds, "TLD");
+    if (cur_level > max_level) {
+	print_func("\tYou must start %s with -l %d\n", progname, cur_level);
+	print_func("\tto collect this level of domain stats.\n", progname);
+	return;
+    }
+    StringCounter_report(Domains[cur_level], "Query Name");
 }
 
-void
-Sld_report(void)
+const char *
+Qtype_col_fmt(const SortItem * si)
 {
-    if (0 == sld_flag) {
-	print_func("\tYou must start %s with the -s option\n", progname);
-	print_func("\tto collect 2nd level domain stats.\n", progname);
-    } else {
-	StringCounter_report(Slds, "SLD");
-    }
-}
-void
-Nld_report(void)
-{
-    if (0 == nld_flag) {
-	print_func("\tYou must start %s with the -t option\n", progname);
-	print_func("\tto collect 3nd level domain stats.\n", progname);
-    } else {
-	StringCounter_report(Nlds, "3LD");
-    }
+    return si->ptr;
 }
 
 void
 Qtypes_report(void)
 {
     int type;
-    int nlines = get_nlines();
-    print_func("%-10s %9s %6s\n", "Query Type", "count", "%");
-    print_func("%-10s %9s %6s\n", "----------", "---------", "------");
+    SortItem *sortme = calloc(T_MAX, sizeof(SortItem));
+    int sortsize = 0;
     for (type = 0; type < T_MAX; type++) {
 	if (0 == qtype_counts[type])
 	    continue;
-	print_func("%-10s %9d %6.1f\n",
-	    qtype_str(type),
-	    qtype_counts[type],
-	    100.0 * qtype_counts[type] / (query_count_total + reply_count_total));
-	if (0 == --nlines)
-	    break;
+	sortme[sortsize].cnt = qtype_counts[type];
+	sortme[sortsize].ptr = qtype_str(type);	/* XXX danger */
+	sortsize++;
     }
+    qsort(sortme, sortsize, sizeof(SortItem), SortItem_cmp);
+    Table_report(sortme, sortsize,
+	"Query Type", NULL,
+	Qtype_col_fmt, NULL,
+	query_count_total + reply_count_total);
+    free(sortme);
 }
 
 void
 Opcodes_report(void)
 {
     int op;
-    int nlines = get_nlines();
-    print_func("%-10s %9s %6s\n", "Opcode    ", "count", "%");
-    print_func("%-10s %9s %6s\n", "----------", "---------", "------");
+    SortItem *sortme = calloc(OP_MAX, sizeof(SortItem));
+    int sortsize = 0;
     for (op = 0; op < OP_MAX; op++) {
 	if (0 == opcode_counts[op])
 	    continue;
-	print_func("%-10s %9d %6.1f\n",
-	    opcode_str(op),
-	    opcode_counts[op],
-	    100.0 * opcode_counts[op] / (query_count_total + reply_count_total));
-	if (0 == --nlines)
-	    break;
+	sortme[sortsize].cnt = opcode_counts[op];
+	sortme[sortsize].ptr = opcode_str(op);	/* XXX danger */
+	sortsize++;
     }
+    Table_report(sortme, sortsize,
+	"Opcode", NULL,
+	Qtype_col_fmt, NULL,
+	query_count_total + reply_count_total);
+    free(sortme);
+}
+
+const char *
+AgentAddr_col_fmt(const SortItem * si)
+{
+    AgentAddr *a = si->ptr;
+    return anon_inet_ntoa(&a->src);
 }
 
 void
@@ -1241,8 +1347,6 @@ AgentAddr_report(hashtbl * tbl, const char *what)
 {
     int sortsize = hash_count(tbl);
     SortItem *sortme = calloc(sortsize, sizeof(SortItem));
-    int i;
-    int nlines = get_nlines();
     AgentAddr *a;
     hash_iter_init(tbl);
     sortsize = 0;
@@ -1252,27 +1356,34 @@ AgentAddr_report(hashtbl * tbl, const char *what)
 	sortsize++;
     }
     qsort(sortme, sortsize, sizeof(SortItem), SortItem_cmp);
-
-    print_func("%-40s %9s %6s\n", what, "count", "%");
-    print_func("%-40s %9s %6s\n", "----------------", "---------", "------");
-    for (i = 0; i < nlines && i < sortsize; i++) {
-	a = sortme[i].ptr;
-	print_func("%-40s %9d %6.1f\n",
-	    anon_inet_ntoa(&a->src),
-	    a->count,
-	    100.0 * a->count / (query_count_total + reply_count_total));
-    }
-
+    Table_report(sortme, sortsize,
+	what, NULL,
+	AgentAddr_col_fmt, NULL,
+	query_count_total + reply_count_total);
     free(sortme);
 }
+
+const char *
+StringAddr_col1_fmt(const SortItem * si)
+{
+    StringAddrCounter *ssc = si->ptr;
+    return anon_inet_ntoa(&ssc->straddr.addr);
+}
+
+const char *
+StringAddr_col2_fmt(const SortItem * si)
+{
+    StringAddrCounter *ssc = si->ptr;
+    return ssc->straddr.str;
+}
+
+
 
 void
 StringAddrCounter_report(hashtbl * tbl, char *what1, char *what2)
 {
     int sortsize = hash_count(tbl);
     SortItem *sortme = calloc(sortsize, sizeof(SortItem));
-    int i;
-    int nlines = get_nlines();
     StringAddrCounter *ssc;
     hash_iter_init(tbl);
     sortsize = 0;
@@ -1282,40 +1393,22 @@ StringAddrCounter_report(hashtbl * tbl, char *what1, char *what2)
 	sortsize++;
     }
     qsort(sortme, sortsize, sizeof(SortItem), SortItem_cmp);
-
-    print_func("%-40s %-32s %9s %6s\n", what1, what2, "count", "%");
-    print_func("%-40s %-32s %9s %6s\n",
-	"----------------", "--------------------", "---------", "------");
-    for (i = 0; i < nlines && i < sortsize; i++) {
-	ssc = sortme[i].ptr;
-	print_func("%-40s %-32s %9d %6.1f\n",
-	    anon_inet_ntoa(&ssc->straddr.addr),
-	    ssc->straddr.str,
-	    ssc->count,
-	    100.0 * ssc->count / (query_count_total + reply_count_total));
-    }
+    Table_report(sortme, sortsize,
+	what1, what2,
+	StringAddr_col1_fmt, StringAddr_col2_fmt,
+	query_count_total + reply_count_total);
+    free(sortme);
 }
 
 void
-SldBySource_report(void)
+DomSrc_report(void)
 {
-    if (0 == sld_flag) {
-	print_func("\tYou must start %s with the -s option\n", progname);
-	print_func("\tto collect 2nd level domain stats.\n", progname);
-    } else {
-	StringAddrCounter_report(SSC2, "Source", "SLD");
+    if (cur_level > max_level) {
+	print_func("\tYou must start %s with -l %d\n", progname, cur_level);
+	print_func("\tto collect this level of domain stats.\n", progname);
+	return;
     }
-}
-
-void
-NldBySource_report(void)
-{
-    if (0 == nld_flag) {
-	print_func("\tYou must start %s with the -t option\n", progname);
-	print_func("\tto collect 3nd level domain stats.\n", progname);
-    } else {
-	StringAddrCounter_report(SSC3, "Source", "3LD");
-    }
+    StringAddrCounter_report(DomSrcs[cur_level], "Source", "Query Name");
 }
 
 
@@ -1351,7 +1444,7 @@ report(void)
 	Y++;
     }
     t = time(NULL);
-    move(0, 50);
+    move(0, get_ncols() - 25);
     print_func("%s", ctime(&t));
     move(Y + 1, 0);
     clrtobot();
@@ -1450,20 +1543,17 @@ init_curses(void)
 void
 ResetCounters(void)
 {
+    int lvl;
     if (NULL == Sources)
 	Sources = hash_create(16384, in_addr_hash, cmp_in6_addr);
     if (NULL == Destinations)
 	Destinations = hash_create(16384, in_addr_hash, cmp_in6_addr);
-    if (NULL == Tlds)
-	Tlds = hash_create(8192, string_hash, string_cmp);
-    if (NULL == Slds)
-	Slds = hash_create(8192, string_hash, string_cmp);
-    if (NULL == Nlds)
-	Nlds = hash_create(8192, string_hash, string_cmp);
-    if (NULL == SSC2)
-	SSC2 = hash_create(8192, stringaddr_hash, stringaddr_cmp);
-    if (NULL == SSC3)
-	SSC3 = hash_create(8192, stringaddr_hash, stringaddr_cmp);
+    for (lvl = 1; lvl <= max_level; lvl++) {
+	if (NULL != Domains[lvl])
+	    continue;
+	Domains[lvl] = hash_create(8192, string_hash, string_cmp);
+	DomSrcs[lvl] = hash_create(8192, stringaddr_hash, stringaddr_cmp);
+    }
     query_count_intvl = 0;
     query_count_total = 0;
     memset(qtype_counts, '\0', sizeof(qtype_counts));
@@ -1471,11 +1561,10 @@ ResetCounters(void)
     memset(opcode_counts, '\0', sizeof(opcode_counts));
     hash_free(Sources, free);
     hash_free(Destinations, free);
-    hash_free(Tlds, free);
-    hash_free(Slds, free);
-    hash_free(Nlds, free);
-    hash_free(SSC2, StringAddrCounter_free);
-    hash_free(SSC3, StringAddrCounter_free);
+    for (lvl = 1; lvl <= max_level; lvl++) {
+	hash_free(Domains[lvl], free);
+	hash_free(DomSrcs[lvl], StringAddrCounter_free);
+    }
     memset(&last_ts, '\0', sizeof(last_ts));
 }
 
@@ -1491,8 +1580,7 @@ usage(void)
     fprintf(stderr, "\t-i addr\tIgnore this source IP address\n");
     fprintf(stderr, "\t-p\tDon't put interface in promiscuous mode\n");
     fprintf(stderr, "\t-r\tRedraw interval, in seconds\n");
-    fprintf(stderr, "\t-s\tEnable 2nd level domain stats collection\n");
-    fprintf(stderr, "\t-t\tEnable 3nd level domain stats collection\n");
+    fprintf(stderr, "\t-l N\tEnable domain stats up to N components\n");
     fprintf(stderr, "\t-f\tfilter-name\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "Available filters:\n");
@@ -1529,9 +1617,8 @@ main(int argc, char *argv[])
     SubReport = Sources_report;
     progname = strdup(strrchr(argv[0], '/') ? strchr(argv[0], '/') + 1 : argv[0]);
     srandom(time(NULL));
-    ResetCounters();
 
-    while ((x = getopt(argc, argv, "46ab:f:i:pr:stQR")) != -1) {
+    while ((x = getopt(argc, argv, "46ab:f:i:l:pr:QR")) != -1) {
 	switch (x) {
 	case '4':
 	    opt_count_ipv4 = 1;
@@ -1543,10 +1630,15 @@ main(int argc, char *argv[])
 	    anon_flag = 1;
 	    break;
 	case 's':
-	    sld_flag = 1;
+	    max_level = 2;
 	    break;
 	case 't':
-	    nld_flag = 1;
+	    max_level = 3;
+	    break;
+	case 'l':
+	    max_level = atoi(optarg);
+	    if (max_level < 1 || max_level > 9)
+		usage();
 	    break;
 	case 'p':
 	    promisc_flag = 0;
@@ -1659,6 +1751,9 @@ main(int argc, char *argv[])
 	return 1;
 	break;
     }
+
+    ResetCounters();
+
     if (interactive) {
 	init_curses();
 	redraw();
@@ -1703,14 +1798,14 @@ main(int argc, char *argv[])
 	Qtypes_report();
 	print_func("\n");
 	Opcodes_report();
-	print_func("\n");
-	Tld_report();
-	print_func("\n");
-	Sld_report();
-	print_func("\n");
-	Nld_report();
-	print_func("\n");
-	SldBySource_report();
+	for (cur_level = 1; cur_level <= max_level; cur_level++) {
+	    print_func("\n");
+	    Domain_report();
+	}
+	for (cur_level = 1; cur_level <= max_level; cur_level++) {
+	    print_func("\n");
+	    DomSrc_report();
+	}
     }
 
     pcap_close(pcap);
