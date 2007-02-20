@@ -848,9 +848,11 @@ handle_null(const u_char * pkt, int len)
 {
     unsigned int family;
     memcpy(&family, pkt, sizeof(family));
-    if (AF_INET != family)
-	return 0;
-    return handle_ipv4((struct ip *)(pkt + 4), len - 4);
+    if (AF_INET == family)
+	return handle_ipv4((struct ip *)(pkt + 4), len - 4);
+    if (AF_INET6 == family)
+	return handle_ipv6((struct ip6_hdr *)(pkt + 4), len - 4);
+    return 0;
 }
 
 #ifdef DLT_LOOP
@@ -859,9 +861,11 @@ handle_loop(const u_char * pkt, int len)
 {
     unsigned int family;
     memcpy(&family, pkt, sizeof(family));
-    if (AF_INET != ntohl(family))
-	return 0;
-    return handle_ipv4((struct ip *)(pkt + 4), len - 4);
+    if (AF_INET == ntohl(family))
+	return handle_ipv4((struct ip *)(pkt + 4), len - 4);
+    if (AF_INET6 == ntohl(family))
+	return handle_ipv6((struct ip6_hdr *)(pkt + 4), len - 4);
+    return 0;
 }
 
 #endif
