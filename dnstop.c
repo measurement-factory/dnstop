@@ -211,20 +211,24 @@ Filter_t AforAFilter;
 Filter_t RFC1918PtrFilter;
 Filter_t *Filter = NULL;
 
+/*
+ * Compare two IP addresses.  Start at the high end
+ * because the common case will be IPv4 addresses which
+ * are all the same for the first 12 bytes.
+ */
 int
 cmp_in6_addr(const void *A, const void *B)
 {
     const struct in6_addr *a = A;
     const struct in6_addr *b = B;
-    int i;
-    assert(sizeof(struct in6_addr) == 16);
-    for (i = 0; i < 16; i++)
+    int i = 16;
+    /* assert(sizeof(struct in6_addr) == 16); */
+    while (i--) {
 	if (a->s6_addr[i] != b->s6_addr[i])
-	    break;
-    if (i >= 16)
-	return (0);
-    return (a->s6_addr[i] > b->s6_addr[i] ? 1 : -1);
-}				/* int cmp_addrinfo */
+	    return (a->s6_addr[i] > b->s6_addr[i] ? 1 : -1);
+    }
+    return 0;
+}
 
 inline int
 ignore_list_match(const struct in6_addr *addr)
