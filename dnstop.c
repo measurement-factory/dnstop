@@ -41,7 +41,7 @@
 #include <netdb.h>
 
 #include "hashtbl.h"
-static hashkeycmp in_addr_cmp;
+static hashkeycmp cmp_in6_addr;
 static hashfunc in_addr_hash;
 
 #define PCAP_SNAPLEN 1460
@@ -212,20 +212,17 @@ Filter_t RFC1918PtrFilter;
 Filter_t *Filter = NULL;
 
 int
-cmp_in6_addr(const struct in6_addr *a,
-    const struct in6_addr *b)
+cmp_in6_addr(const void *A, const void *B)
 {
+    const struct in6_addr *a = A;
+    const struct in6_addr *b = B;
     int i;
-
     assert(sizeof(struct in6_addr) == 16);
-
     for (i = 0; i < 16; i++)
 	if (a->s6_addr[i] != b->s6_addr[i])
 	    break;
-
     if (i >= 16)
 	return (0);
-
     return (a->s6_addr[i] > b->s6_addr[i] ? 1 : -1);
 }				/* int cmp_addrinfo */
 
@@ -424,7 +421,7 @@ stringaddr_cmp(const void *a, const void *b)
     int x = strcmp(A->str, B->str);
     if (x)
 	return x;
-    return in_addr_cmp(&A->addr, &B->addr);
+    return cmp_in6_addr(&A->addr, &B->addr);
 }
 
 StringAddrCounter *
@@ -466,18 +463,6 @@ in_addr_hash(const void *key)
     if (is_v4_in_v6(key))
 	return SuperFastHash((char *)key + 12, 4);
     return SuperFastHash(key, 16);
-}
-
-static int
-in_addr_cmp(const void *a, const void *b)
-{
-    struct in_addr A = *(struct in_addr *)a;
-    struct in_addr B = *(struct in_addr *)b;
-    if (A.s_addr < B.s_addr)
-	return -1;
-    if (A.s_addr > B.s_addr)
-	return 1;
-    return 0;
 }
 
 #define RFC1035_MAXLABELSZ 63
@@ -1462,9 +1447,9 @@ void
 ResetCounters(void)
 {
     if (NULL == Sources)
-	Sources = hash_create(16384, in_addr_hash, in_addr_cmp);
+	Sources = hash_create(16384, in_addr_hash, cmp_in6_addr);
     if (NULL == Destinations)
-	Destinations = hash_create(16384, in_addr_hash, in_addr_cmp);
+	Destinations = hash_create(16384, in_addr_hash, cmp_in6_addr);
     if (NULL == Tlds)
 	Tlds = hash_create(8192, string_hash, string_cmp);
     if (NULL == Slds)
