@@ -464,7 +464,7 @@ static unsigned int
 in_addr_hash(const void *key)
 {
     if (is_v4_in_v6(key))
-	return SuperFastHash(key + 12, 4);
+	return SuperFastHash((char *)key + 12, 4);
     return SuperFastHash(key, 16);
 }
 
@@ -800,7 +800,7 @@ handle_ipv4(const struct ip *ip, int len)
 
     if (IPPROTO_UDP != ip->ip_p)
 	return 0;
-    memcpy(buf, (void *)ip + offset, len - offset);
+    memcpy(buf, (char *)ip + offset, len - offset);
     if (0 == handle_udp((struct udphdr *)buf, len - offset, &src_addr, &dst_addr))
 	return 0;
     clt = AgentAddr_lookup_or_add(Sources, &src_addr);

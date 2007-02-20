@@ -1,3 +1,8 @@
+2007/02/19 Florian Forster
+
+    Arithmetic on void pointers is not well defined and Solaris
+    complains.  Cast to char pointer instead.
+
 2007/02/19 Dirk Jagdmann
 
     Added USE_IP6 define so that v6-code can be disabled somewhat
