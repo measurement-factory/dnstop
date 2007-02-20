@@ -1491,6 +1491,8 @@ usage(void)
 {
     fprintf(stderr, "usage: %s [opts] netdevice|savefile\n",
 	progname);
+    fprintf(stderr, "\t-4\tCount IPv4 packets\n");
+    fprintf(stderr, "\t-6\tCount IPv6 packets\n");
     fprintf(stderr, "\t-a\tAnonymize IP Addrs\n");
     fprintf(stderr, "\t-b expr\tBPF program code\n");
     fprintf(stderr, "\t-i addr\tIgnore this source IP address\n");
