@@ -211,9 +211,8 @@ Filter_t RFC1918PtrFilter;
 Filter_t *Filter = NULL;
 
 /*
- * Compare two IP addresses.  Start at the high end
- * because the common case will be IPv4 addresses which
- * are all the same for the first 12 bytes.
+ * Compare two IP addresses.  Start at the high end because the common case
+ * will be IPv4 addresses which are all the same for the first 12 bytes.
  */
 int
 cmp_in6_addr(const void *A, const void *B)
