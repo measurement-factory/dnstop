@@ -165,6 +165,7 @@ typedef const char *(col_fmt) (const SortItem *);
 #endif
 #define C_MAX 65536
 #define OP_MAX 16
+#define RC_MAX 16
 
 int query_count_intvl = 0;
 int query_count_total = 0;
@@ -172,6 +173,7 @@ int reply_count_intvl = 0;
 int reply_count_total = 0;
 int qtype_counts[T_MAX];
 int opcode_counts[OP_MAX];
+int rcode_counts[RC_MAX];
 int qclass_counts[C_MAX];
 hashtbl *Sources = NULL;
 hashtbl *Destinations = NULL;
@@ -190,6 +192,7 @@ void Sources_report(void);
 void Destinatioreport(void);
 void Qtypes_report(void);
 void Opcodes_report(void);
+void Rcodes_report(void);
 void Domain_report();
 void DomSrc_report();
 void Help_report(void);
@@ -628,6 +631,7 @@ handle_dns(const char *buf, int len,
     qtype_counts[qtype]++;
     qclass_counts[qclass]++;
     opcode_counts[qh.opcode]++;
+    rcode_counts[qh.rcode]++;
 
     for (lvl = 1; lvl <= max_level; lvl++) {
 	s = QnameToNld(qname, lvl);
@@ -1016,6 +1020,9 @@ keyboard(void)
     case 'o':
 	SubReport = Opcodes_report;
 	break;
+    case 'r':
+	SubReport = Rcodes_report;
+	break;
     case 030:
 	Quit = 1;
 	break;
@@ -1038,6 +1045,7 @@ void
 gotsigalrm(int sig)
 {
     do_redraw = 1;
+    signal(sig, gotsigalrm);
 }
 
 void
@@ -1047,6 +1055,7 @@ Help_report(void)
     print_func(" d - Destinations list\n");
     print_func(" t - Query types\n");
     print_func(" o - Opcodes\n");
+    print_func(" r - Rcodes\n");
     print_func(" 1 - 1st level Query Names"
 	"\t! - with Sources\n");
     print_func(" 2 - 2nd level Query Names"
@@ -1147,6 +1156,51 @@ opcode_str(int o)
 	break;
     default:
 	snprintf(buf, 30, "Opcode%d", o);
+	return buf;
+    }
+    /* NOTREACHED */
+}
+
+char *
+rcode_str(int r)
+{
+    static char buf[30];
+    switch (r) {
+    case 0:
+	return "Noerror";
+	break;
+    case 1:
+	return "Formerr";
+	break;
+    case 2:
+	return "Servfail";
+	break;
+    case 3:
+	return "Nxdomain";
+	break;
+    case 4:
+	return "Notimpl";
+	break;
+    case 5:
+	return "Refused";
+	break;
+    case 6:
+	return "Yxdomain";
+	break;
+    case 7:
+	return "Yxrrset";
+	break;
+    case 8:
+	return "Nxrrset";
+	break;
+    case 9:
+	return "Notauth";
+	break;
+    case 10:
+	return "Notzone";
+	break;
+    default:
+	snprintf(buf, 30, "Rcode%d", r);
 	return buf;
     }
     /* NOTREACHED */
@@ -1330,6 +1384,26 @@ Opcodes_report(void)
     }
     Table_report(sortme, sortsize,
 	"Opcode", NULL,
+	Qtype_col_fmt, NULL,
+	query_count_total + reply_count_total);
+    free(sortme);
+}
+
+void
+Rcodes_report(void)
+{
+    int rc;
+    SortItem *sortme = calloc(OP_MAX, sizeof(SortItem));
+    int sortsize = 0;
+    for (rc = 0; rc < RC_MAX; rc++) {
+	if (0 == rcode_counts[rc])
+	    continue;
+	sortme[sortsize].cnt = rcode_counts[rc];
+	sortme[sortsize].ptr = rcode_str(rc);	/* XXX danger */
+	sortsize++;
+    }
+    Table_report(sortme, sortsize,
+	"Rcode", NULL,
 	Qtype_col_fmt, NULL,
 	query_count_total + reply_count_total);
     free(sortme);
@@ -1559,6 +1633,7 @@ ResetCounters(void)
     memset(qtype_counts, '\0', sizeof(qtype_counts));
     memset(qclass_counts, '\0', sizeof(qclass_counts));
     memset(opcode_counts, '\0', sizeof(opcode_counts));
+    memset(rcode_counts, '\0', sizeof(rcode_counts));
     hash_free(Sources, free);
     hash_free(Destinations, free);
     for (lvl = 1; lvl <= max_level; lvl++) {
@@ -1798,6 +1873,7 @@ main(int argc, char *argv[])
 	Qtypes_report();
 	print_func("\n");
 	Opcodes_report();
+	Rcodes_report();
 	for (cur_level = 1; cur_level <= max_level; cur_level++) {
 	    print_func("\n");
 	    Domain_report();
