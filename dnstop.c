@@ -1381,6 +1381,7 @@ Opcodes_report(void)
 	sortme[sortsize].ptr = opcode_str(op);	/* XXX danger */
 	sortsize++;
     }
+    qsort(sortme, sortsize, sizeof(SortItem), SortItem_cmp);
     Table_report(sortme, sortsize,
 	"Opcode", NULL,
 	Qtype_col_fmt, NULL,
@@ -1401,6 +1402,7 @@ Rcodes_report(void)
 	sortme[sortsize].ptr = rcode_str(rc);	/* XXX danger */
 	sortsize++;
     }
+    qsort(sortme, sortsize, sizeof(SortItem), SortItem_cmp);
     Table_report(sortme, sortsize,
 	"Rcode", NULL,
 	Qtype_col_fmt, NULL,
