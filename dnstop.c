@@ -385,7 +385,7 @@ AgentAddr_lookup_or_add(hashtbl * tbl, struct in6_addr *addr)
 static unsigned int
 string_hash(const void *s)
 {
-    return SuperFastHash(s, strlen(s));
+    return hashendian(s, strlen(s), 0);
 }
 
 static int
@@ -410,9 +410,9 @@ static unsigned int
 stringaddr_hash(const void *p)
 {
     const StringAddr *sa = p;
-    unsigned int h1 = SuperFastHash(sa->str, strlen(sa->str));
-    unsigned int h2 = SuperFastHash((void *)&sa->addr, 4);
-    return h1 ^ h2;
+    unsigned int h1 = hashendian(sa->str, strlen(sa->str), 0);
+    unsigned int h2 = hashword((uint32_t *)&sa->addr, 1, h1);
+    return h2;
 }
 
 static int
@@ -463,8 +463,8 @@ static unsigned int
 in_addr_hash(const void *key)
 {
     if (is_v4_in_v6(key))
-	return SuperFastHash((char *)key + 12, 4);
-    return SuperFastHash(key, 16);
+	return hashword((uint32_t *) key + 3, 1, 0);
+    return hashword(key, 4, 0);
 }
 
 #define RFC1035_MAXLABELSZ 63

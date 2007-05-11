@@ -35,4 +35,14 @@ void *hash_iterate(hashtbl *);
 int hash_count(hashtbl *);
 void hash_free(hashtbl *, void freefunc(void *));
 
-extern unsigned int SuperFastHash (const char * data, int len);
+extern uint32_t hashlittle(const void *key, size_t length, uint32_t initval);
+extern uint32_t hashbig(const void *key, size_t length, uint32_t initval);
+extern uint32_t hashword(const uint32_t *k, size_t length, uint32_t initval);
+
+#ifndef BYTE_ORDER
+#define hashendian hashlittle
+#elif BYTE_ORDER == BIG_ENDIAN
+#define hashendian hashbig
+#else
+#define hashendian hashlittle
+#endif

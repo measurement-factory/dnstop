@@ -6,10 +6,12 @@ CC=gcc
 SRCS=	$(PROG).c \
 	hashtbl.c \
 	hashtbl.h \
-	known_tlds.h
+	known_tlds.h \
+	lookup3.c
 
 OBJS=	$(PROG).o \
-	hashtbl.o
+	hashtbl.o \
+	lookup3.o
 
 PREFIX=	/usr/local
 
