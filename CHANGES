@@ -1,3 +1,9 @@
+2007/05/10 Duane Wessels
+
+    Replaced unlicensed "SuperFastHash" with public domain
+    "lookup3.c" by Bob Jenkins, from
+    http://www.burtleburtle.net/bob/c/lookup3.c
+
 2007/03/02 Duane Wessels
 
     Added Rcode table
