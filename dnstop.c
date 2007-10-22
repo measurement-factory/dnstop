@@ -163,6 +163,21 @@ typedef const char *(col_fmt) (const SortItem *);
 #ifndef T_SRV
 #define T_SRV 33
 #endif
+#ifndef T_DS
+#define T_DS 43
+#endif
+#ifndef T_RRSIG
+#define T_RRSIG 46
+#endif
+#ifndef T_NSEC
+#define T_NSEC 47
+#endif
+#ifndef T_DNSKEY
+#define T_DNSKEY 48
+#endif
+#ifndef T_SPF
+#define T_SPF 99
+#endif
 #define C_MAX 65536
 #define OP_MAX 16
 #define RC_MAX 16
@@ -1122,6 +1137,21 @@ qtype_str(int t)
 	break;
     case T_A6:
 	return "A6?";
+	break;
+    case T_DS:
+	return "DS?";
+	break;
+    case T_RRSIG:
+	return "RRSIG?";
+	break;
+    case T_NSEC:
+	return "NSEC?";
+	break;
+    case T_DNSKEY:
+	return "DNSKEY?";
+	break;
+    case T_SPF:
+	return "SPF?";
 	break;
     case T_ANY:
 	return "ANY?";
