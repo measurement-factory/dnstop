@@ -9,6 +9,7 @@ dnstop.c
 known_tlds.h
 hashtbl.c
 hashtbl.h
+lookup3.c
 "
 
 chmod a+r $FILES
