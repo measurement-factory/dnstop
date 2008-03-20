@@ -426,7 +426,7 @@ stringaddr_hash(const void *p)
 {
     const StringAddr *sa = p;
     unsigned int h1 = hashendian(sa->str, strlen(sa->str), 0);
-    unsigned int h2 = hashword((uint32_t *)&sa->addr, 1, h1);
+    unsigned int h2 = hashword((uint32_t *) & sa->addr, 1, h1);
     return h2;
 }
 
