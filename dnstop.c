@@ -44,7 +44,7 @@
 static hashkeycmp cmp_in6_addr;
 static hashfunc in_addr_hash;
 
-#define PCAP_SNAPLEN 1460
+#define PCAP_SNAPLEN 65535
 #define MAX_QNAME_SZ 512
 #define DNS_MSG_HDR_SZ 12
 #ifndef ETHER_HDR_LEN
@@ -670,11 +670,9 @@ handle_udp(const struct udphdr *udp, int len,
     const struct in6_addr *src_addr,
     const struct in6_addr *dst_addr)
 {
-    char buf[PCAP_SNAPLEN];
     if (port53 != udp->uh_dport && port53 != udp->uh_sport)
 	return 0;
-    memcpy(buf, udp + 1, len - sizeof(*udp));
-    if (0 == handle_dns(buf, len - sizeof(*udp), src_addr, dst_addr))
+    if (0 == handle_dns((char *)(udp + 1), len - sizeof(*udp), src_addr, dst_addr))
 	return 0;
     return 1;
 }
@@ -683,7 +681,6 @@ handle_udp(const struct udphdr *udp, int len,
 int
 handle_ipv6(struct ip6_hdr *ipv6, int len)
 {
-    char buf[PCAP_SNAPLEN];
     int offset;
     int nexthdr;
 
@@ -744,15 +741,13 @@ handle_ipv6(struct ip6_hdr *ipv6, int len)
 
     /* Catch broken and empty packets */
     if (((offset + payload_len) > len)
-	|| (payload_len == 0)
-	|| (payload_len > PCAP_SNAPLEN))
+	|| (payload_len == 0))
 	return (0);
 
     if (IPPROTO_UDP != nexthdr)
 	return (0);
 
-    memcpy(buf, (char *)ipv6 + offset, payload_len);
-    if (handle_udp((struct udphdr *)buf, payload_len, &src_addr, &dst_addr) == 0)
+    if (handle_udp((struct udphdr *)((char *)ipv6 + offset), payload_len, &src_addr, &dst_addr) == 0)
 	return (0);
 
     if ((agent = AgentAddr_lookup_or_add(Sources, &src_addr)) != NULL)
@@ -768,7 +763,6 @@ handle_ipv6(struct ip6_hdr *ipv6, int len)
 int
 handle_ipv4(const struct ip *ip, int len)
 {
-    char buf[PCAP_SNAPLEN];
     int offset = ip->ip_hl << 2;
     AgentAddr *clt;
     AgentAddr *srv;
@@ -790,8 +784,7 @@ handle_ipv4(const struct ip *ip, int len)
 
     if (IPPROTO_UDP != ip->ip_p)
 	return 0;
-    memcpy(buf, (char *)ip + offset, len - offset);
-    if (0 == handle_udp((struct udphdr *)buf, len - offset, &src_addr, &dst_addr))
+    if (0 == handle_udp((struct udphdr *)((char *)ip + offset), len - offset, &src_addr, &dst_addr))
 	return 0;
     clt = AgentAddr_lookup_or_add(Sources, &src_addr);
     clt->count++;
@@ -804,7 +797,6 @@ handle_ipv4(const struct ip *ip, int len)
 int
 handle_ppp(const u_char * pkt, int len)
 {
-    char buf[PCAP_SNAPLEN];
     unsigned short us;
     unsigned short proto;
     if (len < 2)
@@ -827,8 +819,7 @@ handle_ppp(const u_char * pkt, int len)
     }
     if (ETHERTYPE_IP != proto && PPP_IP != proto)
 	return 0;
-    memcpy(buf, pkt, len);
-    return handle_ipv4((struct ip *)buf, len);
+    return handle_ipv4((struct ip *)pkt, len);
 }
 
 #endif
@@ -872,16 +863,13 @@ handle_raw(const u_char * pkt, int len)
 int
 handle_ip(const u_char * pkt, int len, unsigned short etype)
 {
-    char buf[PCAP_SNAPLEN];
 #if USE_IPV6
     if (ETHERTYPE_IPV6 == etype) {
-	memcpy(buf, pkt, len);
-	return (handle_ipv6((struct ip6_hdr *)buf, len));
+	return (handle_ipv6((struct ip6_hdr *)pkt, len));
     } else
 #endif
     if (ETHERTYPE_IP == etype) {
-	memcpy(buf, pkt, len);
-	return handle_ipv4((struct ip *)buf, len);
+	return handle_ipv4((struct ip *)pkt, len);
     }
     return 0;
 }
