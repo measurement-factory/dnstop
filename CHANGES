@@ -1,3 +1,24 @@
+2008/03/21 Duane Wessels
+
+    Added some standard Makefile variables that could be locally
+    modified by package maintainers.
+
+    Added -v (version) command line option.
+
+    Updated list of known TLDs.
+
+2008/03/20 Dave Plonka
+
+    Fixed a bug that cause dnstop to Memory fault when processing
+    a DNS packet greater than PCAP_SNAPLEN (previously 1460) bytes
+    in size.
+  
+    Raised PCAP_SNAPLEN to 65535 to avoid truncating large DNS
+    packets.
+  
+    Eliminated unnecessary stack buffers and memcpy calls when
+    handling packets.
+
 2007/05/10 Duane Wessels
 
     Replaced unlicensed "SuperFastHash" with public domain
