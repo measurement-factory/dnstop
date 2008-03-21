@@ -14,7 +14,10 @@ OBJS=	$(PROG).o \
 	hashtbl.o \
 	lookup3.o
 
-PREFIX=	/usr/local
+PREFIX=/usr/local
+BINDIR=$(PREFIX)/bin
+DATADIR=$(PREFIX)/share
+MANDIR=$(DATADIR)/man
 
 
 # You may need to uncomment this, esp on Solaris
@@ -23,9 +26,9 @@ XTRALIBS= # -lnsl -lresolv -lsocket
 all: $(PROG)
 
 $(PROG): $(OBJS)
-	$(CC) $(CFLAGS) $(OPTFLAGS) $(LDFLAGS) -o $@ $(OBJS) -lpcap -lcurses $(XTRALIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) -lpcap -lcurses $(XTRALIBS)
 
-.c.o:
+dnstop.o: dnstop.c
 	$(CC) $(CFLAGS) $(OPTFLAGS) -c $<
 
 clean:
@@ -33,16 +36,16 @@ clean:
 
 tar:
 	mkdir $(PROG)-$(DATE)
-	cp -p LICENSE CHANGES $(SRCS) dnstop.8 Makefile $(PROG)-$(DATE)
+	cp -p LICENSE CHANGES $(SRCS) $(PROG).8 Makefile $(PROG)-$(DATE)
 	tar czvf $(PROG)-$(DATE).tar.gz $(PROG)-$(DATE)
 	chmod 444 $(PROG)-$(DATE).tar.gz
 	rm -rf $(PROG)-$(DATE)
 	md5 *.gz > MD5s.txt
 
 install: $(PROG)
-	install -m 755 $(PROG) $(PREFIX)/bin
-	install -m 644 dnstop.8 $(PREFIX)/man/man8
+	install -m 755 $(PROG) $(BINDIR)
+	install -m 644 $(PROG).8 $(MANDIR)/man8
 
 uninstall:
-	rm -f $(PREFIX)/bin/$(PROG) $(PREFIX)/man/man8/dnstop.8
-
+	rm -f $(BINDIR)/$(PROG)
+	rm -f $(MANDIR)/man8/$(PROG).8
