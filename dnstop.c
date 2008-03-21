@@ -7,6 +7,8 @@
  * the LICENSE file for details.
  */
 
+static const char *Version = "@VERSION@";
+
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/stat.h>
@@ -1712,7 +1714,7 @@ main(int argc, char *argv[])
     progname = strdup(strrchr(argv[0], '/') ? strchr(argv[0], '/') + 1 : argv[0]);
     srandom(time(NULL));
 
-    while ((x = getopt(argc, argv, "46ab:f:i:l:pr:QR")) != -1) {
+    while ((x = getopt(argc, argv, "46ab:f:i:l:pr:QRvV")) != -1) {
 	switch (x) {
 	case '4':
 	    opt_count_ipv4 = 1;
@@ -1755,6 +1757,11 @@ main(int argc, char *argv[])
 	case 'R':
 	    opt_count_replies = 1;
 	    break;
+	case 'v':
+	case 'V':
+	    fprintf(stderr, "dnstop Version: %s\n", Version);
+	    fprintf(stderr, "http://dnstop.measurement-factory.com/\n");
+	    exit(0);
 	default:
 	    usage();
 	    break;
