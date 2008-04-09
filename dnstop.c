@@ -137,6 +137,7 @@ static unsigned short port53;
 void (*SubReport) (void)= NULL;
 int (*handle_datalink) (const u_char * pkt, int len)= NULL;
 int Quit = 0;
+int Got_EOF = 0;
 char *progname = NULL;
 int anon_flag = 0;
 int max_level = 2;
@@ -1528,6 +1529,8 @@ report(void)
     if (opt_count_queries) {
 	print_func("Queries: %d new, %d total",
 	    query_count_intvl, query_count_total);
+	if (Got_EOF)
+	    print_func(", EOF");
 	clrtoeol();
 	Y++;
     }
@@ -1535,6 +1538,8 @@ report(void)
 	move(Y, 0);
 	print_func("Replies: %d new, %d total",
 	    reply_count_intvl, reply_count_total);
+	if (Got_EOF)
+	    print_func(", EOF");
 	clrtoeol();
 	Y++;
     }
@@ -1882,10 +1887,12 @@ main(int argc, char *argv[])
 		/* block on keyboard until user quits */
 		readfile_state++;
 		nodelay(w, 0);
+		do_redraw = 1;
+		Got_EOF = 1;
 	    }
-	    keyboard();
 	    if (do_redraw || 0 == redraw_interval)
 		redraw();
+	    keyboard();
 	}
 	endwin();		/* klin, Thu Nov 28 08:56:51 2002 */
     } else {
