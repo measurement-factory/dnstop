@@ -232,7 +232,7 @@ Filter_t *Filter = NULL;
  * Compare two IP addresses.  Start at the high end because the common case
  * will be IPv4 addresses which are all the same for the first 12 bytes.
  */
-int
+static int
 cmp_in6_addr(const void *A, const void *B)
 {
     const struct in6_addr *a = A;
@@ -246,7 +246,7 @@ cmp_in6_addr(const void *A, const void *B)
     return 0;
 }
 
-inline int
+int
 ignore_list_match(const struct in6_addr *addr)
 {
     ip_list_t *ptr;
@@ -834,8 +834,10 @@ handle_null(const u_char * pkt, int len)
     memcpy(&family, pkt, sizeof(family));
     if (AF_INET == family)
 	return handle_ipv4((struct ip *)(pkt + 4), len - 4);
+#if USE_IPV6
     if (AF_INET6 == family)
 	return handle_ipv6((struct ip6_hdr *)(pkt + 4), len - 4);
+#endif
     return 0;
 }
 
@@ -847,8 +849,10 @@ handle_loop(const u_char * pkt, int len)
     memcpy(&family, pkt, sizeof(family));
     if (AF_INET == ntohl(family))
 	return handle_ipv4((struct ip *)(pkt + 4), len - 4);
+#if USE_IPV6
     if (AF_INET6 == ntohl(family))
 	return handle_ipv6((struct ip6_hdr *)(pkt + 4), len - 4);
+#endif
     return 0;
 }
 
