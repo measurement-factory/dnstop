@@ -35,15 +35,17 @@ on 1 byte), but shoehorning those bytes into integers efficiently is messy.
 */
 #define SELF_TEST 0
 
+#include "config.h"
 #include <stdio.h>      /* defines printf for tests */
 #include <time.h>       /* defines time_t for timings in the test */
-#ifdef __sun
+#ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
-#else
+#endif
+#ifdef HAVE_STDINT_H
 #include <stdint.h>     /* defines uint32_t etc */
 #endif
 #include <sys/param.h>  /* attempt to define endianness */
-#ifdef linux
+#ifdef HAVE_ENDIAN_H
 # include <endian.h>    /* attempt to define endianness */
 #endif
 

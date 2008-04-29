@@ -1,8 +1,11 @@
-CFLAGS=-g -Wall
-OPTFLAGS=-DUSE_IPV6=1 -DUSE_PPP=0
 PROG=dnstop
 DATE != date +%Y%m%d
-CC=gcc
+
+CC=@CC@
+CFLAGS=@CFLAGS@
+LIBS=@LIBS@
+OPTFLAGS=@OPTFLAGS@
+PREFIX=@prefix@
 
 SRCS=	$(PROG).c \
 	hashtbl.c \
@@ -14,25 +17,28 @@ OBJS=	$(PROG).o \
 	hashtbl.o \
 	lookup3.o
 
-PREFIX=/usr/local
 BINDIR=$(PREFIX)/bin
 DATADIR=$(PREFIX)/share
 MANDIR=$(DATADIR)/man
 
-
-# You may need to uncomment this, esp on Solaris
-XTRALIBS= # -lnsl -lresolv -lsocket
-
 all: $(PROG)
 
 $(PROG): $(OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) -lpcap -lcurses $(XTRALIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) ${LIBS}
 
 dnstop.o: dnstop.c
 	$(CC) $(CFLAGS) $(OPTFLAGS) -c $<
 
 clean:
 	rm -f $(PROG) $(OBJS) $(PROG).core $(PROG).c~
+
+distclean: clean
+	rm -rf autom4te.cache
+	rm -f config.h
+	rm -f config.log
+	rm -f config.status
+	rm -f config.status.lineno
+	rm -f Makefile
 
 tar:
 	mkdir $(PROG)-$(DATE)

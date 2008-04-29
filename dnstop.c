@@ -9,6 +9,8 @@
 
 static const char *Version = "@VERSION@";
 
+#include "config.h"
+
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/stat.h>
@@ -27,7 +29,7 @@ static const char *Version = "@VERSION@";
 #include <assert.h>
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
-#ifdef __APPLE__
+#ifdef HAVE_ARPA_NAMESER_COMPAT_H
 #include <arpa/nameser_compat.h>
 #endif
 
@@ -41,6 +43,12 @@ static const char *Version = "@VERSION@";
 #include <netinet/ip6.h>
 #include <netinet/udp.h>
 #include <netdb.h>
+
+#ifdef HAVE_NET_IF_PPP_H
+#include <net/if_ppp.h>
+#define PPP_ADDRESS_VAL       0xff	/* The address byte value */
+#define PPP_CONTROL_VAL       0x03	/* The control byte value */
+#endif
 
 #include "hashtbl.h"
 static hashkeycmp cmp_in6_addr;
@@ -59,12 +67,6 @@ static hashfunc in_addr_hash;
 #endif
 #ifndef ETHERTYPE_IPV6
 #define ETHERTYPE_IPV6 0x86DD
-#endif
-
-#if USE_PPP
-#include <net/if_ppp.h>
-#define PPP_ADDRESS_VAL       0xff	/* The address byte value */
-#define PPP_CONTROL_VAL       0x03	/* The control byte value */
 #endif
 
 #if defined(__linux__) || defined(__GLIBC__) || defined(__GNU__)
@@ -197,7 +199,7 @@ hashtbl *Sources = NULL;
 hashtbl *Destinations = NULL;
 hashtbl *Domains[10];
 hashtbl *DomSrcs[10];
-#ifdef __OpenBSD__
+#ifdef HAVE_STRUCT_BPF_TIMEVAL
 struct bpf_timeval last_ts;
 #else
 struct timeval last_ts;
@@ -796,7 +798,7 @@ handle_ipv4(const struct ip *ip, int len)
     return 1;
 }
 
-#if USE_PPP
+#ifdef PPP_IP
 int
 handle_ppp(const u_char * pkt, int len)
 {
@@ -824,7 +826,6 @@ handle_ppp(const u_char * pkt, int len)
 	return 0;
     return handle_ipv4((struct ip *)pkt, len);
 }
-
 #endif
 
 int
