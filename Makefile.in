@@ -5,7 +5,13 @@ CC=@CC@
 CFLAGS=@CFLAGS@
 LIBS=@LIBS@
 OPTFLAGS=@OPTFLAGS@
-PREFIX=@prefix@
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+bindir=@bindir@
+datarootdir=@datarootdir@
+datadir=@datadir@
+mandir=@mandir@
 
 SRCS=	$(PROG).c \
 	hashtbl.c \
@@ -16,10 +22,6 @@ SRCS=	$(PROG).c \
 OBJS=	$(PROG).o \
 	hashtbl.o \
 	lookup3.o
-
-BINDIR=$(PREFIX)/bin
-DATADIR=$(PREFIX)/share
-MANDIR=$(DATADIR)/man
 
 all: $(PROG)
 
@@ -50,9 +52,9 @@ tar:
 	md5 *.gz > MD5s.txt
 
 install: $(PROG)
-	install -m 755 $(PROG) $(BINDIR)
-	install -m 644 $(PROG).8 $(MANDIR)/man8
+	install -m 755 $(PROG) ${bindir}
+	install -m 644 $(PROG).8 ${mandir}/man8
 
 uninstall:
-	rm -f $(BINDIR)/$(PROG)
-	rm -f $(MANDIR)/man8/$(PROG).8
+	rm -f ${bindir}/$(PROG)
+	rm -f ${mandir}/man8/$(PROG).8
