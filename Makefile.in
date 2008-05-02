@@ -44,7 +44,8 @@ distclean: clean
 
 tar:
 	mkdir $(PROG)-$(DATE)
-	cp -p LICENSE CHANGES $(SRCS) $(PROG).8 Makefile $(PROG)-$(DATE)
+	cp -p LICENSE CHANGES $(SRCS) $(PROG).8 $(PROG)-$(DATE)
+	cp -p configure Makefile.in config.h.in install-sh $(PROG)-$(DATE)
 	perl -pi -e "s/\@VERSION\@/$(DATE)/" $(PROG)-$(DATE)/dnstop.c
 	tar czvf $(PROG)-$(DATE).tar.gz $(PROG)-$(DATE)
 	chmod 444 $(PROG)-$(DATE).tar.gz
