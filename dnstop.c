@@ -798,7 +798,7 @@ handle_ipv4(const struct ip *ip, int len)
     return 1;
 }
 
-#ifdef PPP_IP
+#ifdef HAVE_NET_IF_PPP_H
 int
 handle_ppp(const u_char * pkt, int len)
 {
@@ -1833,10 +1833,12 @@ main(int argc, char *argv[])
     case DLT_EN10MB:
 	handle_datalink = handle_ether;
 	break;
-#if USE_PPP
+#ifdef DLT_PPP
+#ifdef HAVE_NET_IF_PPP_H
     case DLT_PPP:
 	handle_datalink = handle_ppp;
 	break;
+#endif
 #endif
 #ifdef DLT_LOOP
     case DLT_LOOP:

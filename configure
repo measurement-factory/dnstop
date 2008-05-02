@@ -1249,7 +1249,6 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --disable-ipv6          Enable IPv6 support [default=yes]
-  --enable-ppp            Enable PPP datalink support [default=no]
 
 Some influential environment variables:
   CC          C compiler command
@@ -5669,18 +5668,6 @@ fi
 
 if test "$enable_ipv6" = "yes" ; then
 	OPTFLAGS="$OPTFLAGS -DUSE_IPV6=1"
-
-fi
-
-# Check whether --enable-ppp was given.
-if test "${enable_ppp+set}" = set; then
-  enableval=$enable_ppp;  if test "$enableval" = "no" ; then enable_ppp=no ; else enable_ppp=yes ; fi
-else
-   enable_ppp=no
-fi
-
-if test "$enable_ppp" = "yes" ; then
-	OPTFLAGS="$OPTFLAGS -DUSE_PPP=1"
 
 fi
 

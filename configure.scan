@@ -72,13 +72,5 @@ if test "$enable_ipv6" = "yes" ; then
 	AC_SUBST(OPTFLAGS, ["$OPTFLAGS -DUSE_IPV6=1"])
 fi
 
-AC_ARG_ENABLE(ppp,
-	AS_HELP_STRING([--enable-ppp], [Enable PPP datalink support @<:@default=no@:>@]),
-	[ if test "$enableval" = "no" ; then enable_ppp=no ; else enable_ppp=yes ; fi ],
-	[ enable_ppp=no ])
-if test "$enable_ppp" = "yes" ; then
-	AC_SUBST(OPTFLAGS, ["$OPTFLAGS -DUSE_PPP=1"])
-fi
-
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
