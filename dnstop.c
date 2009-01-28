@@ -1677,6 +1677,8 @@ ResetCounters(void)
     }
     query_count_intvl = 0;
     query_count_total = 0;
+    reply_count_intvl = 0;
+    reply_count_total = 0;
     memset(qtype_counts, '\0', sizeof(qtype_counts));
     memset(qclass_counts, '\0', sizeof(qclass_counts));
     memset(opcode_counts, '\0', sizeof(opcode_counts));
