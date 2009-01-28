@@ -219,15 +219,20 @@ void Help_report(void);
 void ResetCounters(void);
 void report(void);
 
-typedef int
-Filter_t(unsigned short,
-    unsigned short,
-    const char *,
-    const struct in6_addr *,
-    const struct in6_addr *);
+typedef struct {
+	unsigned short qtype;
+	unsigned short qclass;
+	const char *qname;
+	const struct in6_addr *src_addr;
+	const struct in6_addr *dst_addr;
+	unsigned char rcode;
+} FilterData;
+
+typedef int Filter_t(FilterData *);
 Filter_t UnknownTldFilter;
 Filter_t AforAFilter;
 Filter_t RFC1918PtrFilter;
+Filter_t RcodeRefusedFilter;
 Filter_t *Filter = NULL;
 
 /*
@@ -643,8 +648,17 @@ handle_dns(const char *buf, int len,
     memcpy(&us, buf + offset + 2, 2);
     qclass = ntohs(us);
 
-    if (Filter && 0 == Filter(qtype, qclass, qname, src_addr, dst_addr))
-	return 0;
+    if (Filter) {
+	FilterData fd;
+	fd.qtype = qtype;
+	fd.qclass = qclass;
+	fd.qname = qname;
+	fd.src_addr = src_addr;
+	fd.dst_addr = dst_addr;
+	fd.rcode = qh.rcode;
+	if (0 == Filter(&fd))
+	    return 0;
+    }
 
     /* gather stats */
     qtype_counts[qtype]++;
@@ -1565,11 +1579,9 @@ report(void)
 #include "known_tlds.h"
 
 int
-UnknownTldFilter(unsigned short qt, unsigned short qc, const char *qn,
-    const struct in6_addr *sip,
-    const struct in6_addr *dip)
+UnknownTldFilter(FilterData *fd)
 {
-    const char *tld = QnameToNld(qn, 1);
+    const char *tld = QnameToNld(fd->qname, 1);
     unsigned int i;
     if (NULL == tld)
 	return 1;		/* tld is unknown */
@@ -1580,27 +1592,23 @@ UnknownTldFilter(unsigned short qt, unsigned short qc, const char *qn,
 }
 
 int
-AforAFilter(unsigned short qt, unsigned short qc, const char *qn,
-    const struct in6_addr *sip,
-    const struct in6_addr *dip)
+AforAFilter(FilterData *fd)
 {
     struct in_addr a;
-    if (qt != T_A)
+    if (fd->qtype != T_A)
 	return 0;
-    return inet_aton(qn, &a);
+    return inet_aton(fd->qname, &a);
 }
 
 int
-RFC1918PtrFilter(unsigned short qt, unsigned short qc, const char *qn,
-    const struct in6_addr *sip,
-    const struct in6_addr *dip)
+RFC1918PtrFilter(FilterData *fd)
 {
     char *t;
     char q[128];
     unsigned int i = 0;
-    if (qt != T_PTR)
+    if (fd->qtype != T_PTR)
 	return 0;
-    strncpy(q, qn, sizeof(q) - 1);
+    strncpy(q, fd->qname, sizeof(q) - 1);
     q[sizeof(q) - 1] = '\0';
     t = strstr(q, ".in-addr.arpa");
     if (NULL == t)
@@ -1619,6 +1627,12 @@ RFC1918PtrFilter(unsigned short qt, unsigned short qc, const char *qn,
     return 0;
 }
 
+int
+RcodeRefusedFilter(FilterData *fd)
+{
+    return ns_r_refused == fd->rcode ? 1 : 0;
+}
+
 void
 set_filter(const char *fn)
 {
@@ -1628,6 +1642,8 @@ set_filter(const char *fn)
 	Filter = AforAFilter;
     else if (0 == strcmp(fn, "rfc1918-ptr"))
 	Filter = RFC1918PtrFilter;
+    else if (0 == strcmp(fn, "refused"))
+	Filter = RcodeRefusedFilter;
     else
 	Filter = NULL;
 }
@@ -1681,6 +1697,8 @@ usage(void)
 	progname);
     fprintf(stderr, "\t-4\tCount IPv4 packets\n");
     fprintf(stderr, "\t-6\tCount IPv6 packets\n");
+    fprintf(stderr, "\t-Q\tCount queries\n");
+    fprintf(stderr, "\t-R\tCount responses\n");
     fprintf(stderr, "\t-a\tAnonymize IP Addrs\n");
     fprintf(stderr, "\t-b expr\tBPF program code\n");
     fprintf(stderr, "\t-i addr\tIgnore this source IP address\n");
@@ -1693,6 +1711,7 @@ usage(void)
     fprintf(stderr, "\tunknown-tlds\n");
     fprintf(stderr, "\tA-for-A\n");
     fprintf(stderr, "\trfc1918-ptr\n");
+    fprintf(stderr, "\trefused\n");
     exit(1);
 }
 

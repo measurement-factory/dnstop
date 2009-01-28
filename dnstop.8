@@ -34,6 +34,10 @@ The options are as follows:
 count only messages with IPv4 addresses
 .It Fl 6
 count only messages with IPv6 addresses
+.It Fl Q
+count only DNS query messages
+.It Fl R
+count only DNS reply messages
 .It Fl a
 anonymize addresses
 .It Fl b Ar expression
@@ -77,11 +81,13 @@ The "rfc1918-ptr" filter
 includes only PTR queries for addresses in RFC1918 space.
 These should never leak from inside an
 organization.
+.Pp
+The "refused" filter, when used with the
+.Fl R
+option, tells
+.Nm
+to count only responses with rcode REFUSED.
 .\"
-.It Fl Q
-count only DNS query messages
-.It Fl R
-count only DNS reply messages
 .It Ar savefile
 a captured network trace in 
 .Cm pcap
