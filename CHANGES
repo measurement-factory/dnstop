@@ -1,3 +1,7 @@
+2009/01/28 Duane Wessels
+
+    Added "refused" filter to show only responses that were refused.
+
 2008/03/21 Duane Wessels
 
     Added some standard Makefile variables that could be locally
