@@ -11,8 +11,10 @@ AC_PROG_CC
 AC_PROG_INSTALL
 
 # Checks for libraries.
-# FIXME: Replace `main' with a function in `-lcurses':
+AC_CHECK_LIB([ncurses], [initscr])
+if test "$ac_cv_lib_ncurses_initscr" != "yes" ; then
 AC_CHECK_LIB([curses], [initscr])
+fi
 AC_CHECK_LIB([pcap], [pcap_open_live])
 AC_CHECK_LIB([socket], [main])
 AC_CHECK_LIB([nsl], [main])
