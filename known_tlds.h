@@ -253,7 +253,6 @@ static const char *KnownTLDS[] = {
 	"ua",
 	"ug",
 	"uk",
-	"um",
 	"us",
 	"uy",
 	"uz",
