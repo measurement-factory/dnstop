@@ -1,3 +1,9 @@
+2010/12/27 Duane Wessels
+
+    Fixed a bug where if stdout was a TTY but stdin was not a TTY,
+    then dnstop would enter a loop on keyboard input and consume
+    100% CPU.  Now it checks that stdin is a TTY as well.
+
 2009/01/28 Duane Wessels
 
     Added "refused" filter to show only responses that were refused.
