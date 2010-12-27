@@ -1822,7 +1822,7 @@ main(int argc, char *argv[])
 	fprintf(stderr, "pcap_open_*: %s\n", errbuf);
 	exit(1);
     }
-    if (0 == isatty(1)) {
+    if (0 == isatty(1) || 0 == isatty(0)) {
 	if (0 == readfile_state) {
 	    fprintf(stderr, "Non-interactive mode requires savefile argument\n");
 	    exit(1);
