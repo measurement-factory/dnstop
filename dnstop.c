@@ -140,6 +140,7 @@ void (*SubReport) (void)= NULL;
 int (*handle_datalink) (const u_char * pkt, int len)= NULL;
 int Quit = 0;
 int Got_EOF = 0;
+unsigned int hash_buckets = 100057;
 char *progname = NULL;
 int anon_flag = 0;
 int max_level = 2;
@@ -188,10 +189,10 @@ typedef const char *(col_fmt) (const SortItem *);
 #define OP_MAX 16
 #define RC_MAX 16
 
-int query_count_intvl = 0;
-int query_count_total = 0;
-int reply_count_intvl = 0;
-int reply_count_total = 0;
+unsigned int query_count_intvl = 0;
+unsigned int query_count_total = 0;
+unsigned int reply_count_intvl = 0;
+unsigned int reply_count_total = 0;
 int qtype_counts[T_MAX];
 int opcode_counts[OP_MAX];
 int rcode_counts[RC_MAX];
@@ -1233,7 +1234,7 @@ dashes(int n)
 }
 
 void
-Table_report(SortItem * sorted, int rows, const char *col1, const char *col2, col_fmt F1, col_fmt F2, int base)
+Table_report(SortItem * sorted, int rows, const char *col1, const char *col2, col_fmt F1, col_fmt F2, unsigned int base)
 {
     int W1 = strlen(col1);
     int W2 = col2 ? strlen(col2) : 0;
@@ -1496,7 +1497,7 @@ report(void)
     time_t t;
     move(Y, 0);
     if (opt_count_queries) {
-	print_func("Queries: %d new, %d total",
+	print_func("Queries: %u new, %u total",
 	    query_count_intvl, query_count_total);
 	if (Got_EOF)
 	    print_func(", EOF");
@@ -1505,7 +1506,7 @@ report(void)
     }
     if (opt_count_replies) {
 	move(Y, 0);
-	print_func("Replies: %d new, %d total",
+	print_func("Replies: %u new, %u total",
 	    reply_count_intvl, reply_count_total);
 	if (Got_EOF)
 	    print_func(", EOF");
@@ -1616,14 +1617,14 @@ ResetCounters(void)
 {
     int lvl;
     if (NULL == Sources)
-	Sources = hash_create(16384, my_inXaddr_hash, my_inXaddr_cmp);
+	Sources = hash_create(hash_buckets, my_inXaddr_hash, my_inXaddr_cmp);
     if (NULL == Destinations)
-	Destinations = hash_create(16384, my_inXaddr_hash, my_inXaddr_cmp);
+	Destinations = hash_create(hash_buckets, my_inXaddr_hash, my_inXaddr_cmp);
     for (lvl = 1; lvl <= max_level; lvl++) {
 	if (NULL != Domains[lvl])
 	    continue;
-	Domains[lvl] = hash_create(8192, string_hash, string_cmp);
-	DomSrcs[lvl] = hash_create(8192, stringaddr_hash, stringaddr_cmp);
+	Domains[lvl] = hash_create(hash_buckets, string_hash, string_cmp);
+	DomSrcs[lvl] = hash_create(hash_buckets, stringaddr_hash, stringaddr_cmp);
     }
     query_count_intvl = 0;
     query_count_total = 0;
@@ -1687,14 +1688,15 @@ struct timeval last_progress = {0,0};
 void
 progress(pcap_t *p)
 {
+    unsigned int msgs = query_count_total+reply_count_total;
     gettimeofday(&now, NULL);
     if (now.tv_sec == last_progress.tv_sec)
 	return;
     time_t wall_elapsed = now.tv_sec - start.tv_sec;
     if (0 == wall_elapsed)
         return;
-    double rate = (double)(query_count_total+reply_count_total) / wall_elapsed;
-    fprintf(stderr, "%7.1f m/s\n", rate);
+    double rate = (double) msgs / wall_elapsed;
+    fprintf(stderr, "%u %7.1f m/s\n", msgs, rate);
     last_progress = now;
 }
 
@@ -1714,7 +1716,7 @@ main(int argc, char *argv[])
     progname = strdup(strrchr(argv[0], '/') ? strchr(argv[0], '/') + 1 : argv[0]);
     srandom(time(NULL));
 
-    while ((x = getopt(argc, argv, "46ab:f:i:l:pPr:QRvV")) != -1) {
+    while ((x = getopt(argc, argv, "46ab:B:f:i:l:pPr:QRvV")) != -1) {
 	switch (x) {
 	case '4':
 	    opt_count_ipv4 = 1;
@@ -1740,10 +1742,13 @@ main(int argc, char *argv[])
 	    promisc_flag = 0;
 	    break;
 	case 'P':
-	    progress_flag = 0;
+	    progress_flag = 1;
 	    break;
 	case 'b':
 	    bpf_program_str = strdup(optarg);
+	    break;
+	case 'B':
+	    hash_buckets = atoi(optarg);
 	    break;
 	case 'i':
 	    ignore_list_add_name(optarg);
