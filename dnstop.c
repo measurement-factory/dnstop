@@ -1729,6 +1729,34 @@ pcap_select(pcap_t * p, int sec, int usec)
     return select(pcap_fileno(p) + 1, &R, NULL, NULL, &to);
 }
 
+struct timeval start = {0,0};
+struct timeval now = {0,0};
+struct timeval last_progress = {0,0};
+
+void
+progress(pcap_t *p)
+{
+    struct stat sb;
+    off_t seek_cur;
+    gettimeofday(&now, NULL);
+    if (now.tv_sec == last_progress.tv_sec)
+	return;
+    time_t wall_elapsed = now.tv_sec - start.tv_sec;
+    if (0 == wall_elapsed)
+        return;
+    double rate = (double)(query_count_total+reply_count_total) / wall_elapsed;
+    seek_cur = lseek(pcap_fileno(p), 0, SEEK_CUR);
+    if (fstat(pcap_fileno(p), &sb) < 0)
+	perror("fstat");
+    double x = (double) seek_cur / sb.st_size;
+    double eta = (1.0 - x) * wall_elapsed / x;
+    fprintf(stderr, "%7.1f m/s, (%lld, %lld), finished in %7.1f sec\n",
+		rate,
+		seek_cur, sb.st_size,
+		eta);
+    last_progress = now;
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -1887,6 +1915,7 @@ main(int argc, char *argv[])
     }
 
     ResetCounters();
+    gettimeofday(&start, NULL);
 
     if (interactive) {
 	init_curses();
@@ -1924,8 +1953,10 @@ main(int argc, char *argv[])
 	}
 	endwin();		/* klin, Thu Nov 28 08:56:51 2002 */
     } else {
-	while (pcap_dispatch(pcap, 50, handle_pcap, NULL))
-	    (void)0;
+	while (pcap_dispatch(pcap, 1, handle_pcap, NULL)) {
+	    if (0 == ((query_count_total+reply_count_total) & 0x3ff))
+		progress(pcap);
+	}
 	cron_pre();
 	Sources_report();
 	print_func("\n");
@@ -1934,6 +1965,7 @@ main(int argc, char *argv[])
 	Qtypes_report();
 	print_func("\n");
 	Opcodes_report();
+	print_func("\n");
 	Rcodes_report();
 	for (cur_level = 1; cur_level <= max_level; cur_level++) {
 	    print_func("\n");
