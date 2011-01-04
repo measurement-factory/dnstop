@@ -145,6 +145,7 @@ int anon_flag = 0;
 int max_level = 2;
 int cur_level = 1;
 int promisc_flag = 1;
+int progress_flag = 0;
 ip_list_t *IgnoreList = NULL;
 int do_redraw = 1;
 int opt_count_queries = 0;
@@ -1654,6 +1655,7 @@ usage(void)
     fprintf(stderr, "\t-b expr\tBPF program code\n");
     fprintf(stderr, "\t-i addr\tIgnore this source IP address\n");
     fprintf(stderr, "\t-p\tDon't put interface in promiscuous mode\n");
+    fprintf(stderr, "\t-P\tPrint \"progress\" messages in non-interactive mode\n");
     fprintf(stderr, "\t-r\tRedraw interval, in seconds\n");
     fprintf(stderr, "\t-l N\tEnable domain stats up to N components\n");
     fprintf(stderr, "\t-f\tfilter-name\n");
@@ -1712,7 +1714,7 @@ main(int argc, char *argv[])
     progname = strdup(strrchr(argv[0], '/') ? strchr(argv[0], '/') + 1 : argv[0]);
     srandom(time(NULL));
 
-    while ((x = getopt(argc, argv, "46ab:f:i:l:pr:QRvV")) != -1) {
+    while ((x = getopt(argc, argv, "46ab:f:i:l:pPr:QRvV")) != -1) {
 	switch (x) {
 	case '4':
 	    opt_count_ipv4 = 1;
@@ -1736,6 +1738,9 @@ main(int argc, char *argv[])
 	    break;
 	case 'p':
 	    promisc_flag = 0;
+	    break;
+	case 'P':
+	    progress_flag = 0;
 	    break;
 	case 'b':
 	    bpf_program_str = strdup(optarg);
@@ -1893,7 +1898,7 @@ main(int argc, char *argv[])
 	endwin();		/* klin, Thu Nov 28 08:56:51 2002 */
     } else {
 	while (pcap_dispatch(pcap, 1, handle_pcap, NULL)) {
-	    if (0 == ((query_count_total+reply_count_total) & 0x3ff))
+	    if (progress_flag && 0 == ((query_count_total+reply_count_total) & 0x3ff))
 		progress(pcap);
 	}
 	cron_pre();
