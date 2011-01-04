@@ -14,6 +14,7 @@ static const char *Version = "@VERSION@";
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 
 #include <netinet/in.h>
 
@@ -51,8 +52,7 @@ static const char *Version = "@VERSION@";
 #endif
 
 #include "hashtbl.h"
-static hashkeycmp cmp_in6_addr;
-static hashfunc in_addr_hash;
+#include "inX_addr.h"
 
 #define PCAP_SNAPLEN 65535
 #define MAX_QNAME_SZ 512
@@ -75,7 +75,7 @@ static hashfunc in_addr_hash;
 #endif
 
 typedef struct {
-    struct in6_addr src;
+    inX_addr src;
     int count;
 }      AgentAddr;
 
@@ -85,7 +85,7 @@ typedef struct {
 }      StringCounter;
 
 typedef struct {
-    struct in6_addr addr;
+    inX_addr addr;
     char *str;
 }      StringAddr;
 
@@ -117,7 +117,7 @@ struct _rfc1035_header {
 };
 
 struct ip_list_s {
-    struct in6_addr addr;
+    inX_addr addr;
     void *data;
     struct ip_list_s *next;
 };
@@ -223,8 +223,8 @@ typedef struct {
 	unsigned short qtype;
 	unsigned short qclass;
 	const char *qname;
-	const struct in6_addr *src_addr;
-	const struct in6_addr *dst_addr;
+	const inX_addr *src_addr;
+	const inX_addr *dst_addr;
 	unsigned char rcode;
 } FilterData;
 
@@ -235,167 +235,124 @@ Filter_t RFC1918PtrFilter;
 Filter_t RcodeRefusedFilter;
 Filter_t *Filter = NULL;
 
-/*
- * Compare two IP addresses.  Start at the high end because the common case
- * will be IPv4 addresses which are all the same for the first 12 bytes.
- */
-static int
-cmp_in6_addr(const void *A, const void *B)
+unsigned int
+my_inXaddr_hash(const void *key)
 {
-    const struct in6_addr *a = A;
-    const struct in6_addr *b = B;
-    int i = 16;
-    /* assert(sizeof(struct in6_addr) == 16); */
-    while (i--) {
-	if (a->s6_addr[i] != b->s6_addr[i])
-	    return (a->s6_addr[i] > b->s6_addr[i] ? 1 : -1);
-    }
-    return 0;
+	return inXaddr_hash(key, 24);
 }
 
 int
-ignore_list_match(const struct in6_addr *addr)
+my_inXaddr_cmp(const void *a, const void *b)
+{
+	return inXaddr_cmp(a, b);
+}
+
+int
+ignore_list_match(const inX_addr *addr)
 {
     ip_list_t *ptr;
 
     for (ptr = IgnoreList; ptr != NULL; ptr = ptr->next)
-	if (cmp_in6_addr(addr, &ptr->addr) == 0)
+	if (0 == inXaddr_cmp(addr, &ptr->addr))
 	    return (1);
     return (0);
-}				/* int ignore_list_match */
+}
 
 void
-ignore_list_add(const struct in6_addr *addr)
+ignore_list_add(const inX_addr *addr)
 {
     ip_list_t *new;
-
     if (ignore_list_match(addr) != 0)
 	return;
-
     new = malloc(sizeof(ip_list_t));
     if (new == NULL) {
 	perror("malloc");
 	return;
     }
-    memcpy(&new->addr, addr, sizeof(struct in6_addr));
+    new->addr = *addr;
     new->next = IgnoreList;
-
     IgnoreList = new;
-}				/* void ignore_list_add */
+}
 
 void
 ignore_list_add_name(const char *name)
 {
     struct addrinfo *ai_list;
     struct addrinfo *ai_ptr;
-    struct in6_addr addr;
+    inX_addr addr;
     int status;
-
     status = getaddrinfo(name, NULL, NULL, &ai_list);
     if (status != 0)
 	return;
-
     for (ai_ptr = ai_list; ai_ptr != NULL; ai_ptr = ai_ptr->ai_next) {
 	if (ai_ptr->ai_family == AF_INET) {
-	    memset(&addr, '\0', sizeof(addr));
-	    addr.s6_addr[10] = 0xFF;
-	    addr.s6_addr[11] = 0xFF;
-	    memcpy(addr.s6_addr + 12, &((struct sockaddr_in *)ai_ptr->ai_addr)->sin_addr, 4);
-
-	    ignore_list_add(&addr);
+	    inXaddr_assign_v4(&addr, &((struct sockaddr_in *)ai_ptr->ai_addr)->
+sin_addr);
 	} else {
-	    ignore_list_add(&((struct sockaddr_in6 *)ai_ptr->ai_addr)->sin6_addr);
+	    inXaddr_assign_v6(&addr, &((struct sockaddr_in6 *)ai_ptr->ai_addr)->sin6_addr);
 	}
-    }				/* for */
-
+	ignore_list_add(&addr);
+    }
     freeaddrinfo(ai_list);
 }
 
 void
-in6_addr_from_buffer(struct in6_addr *ia,
-    const void *buf, size_t buf_len,
-    int family)
-{
-    memset(ia, 0, sizeof(struct in6_addr));
-    if ((AF_INET == family) && (sizeof(uint32_t) == buf_len)) {
-	ia->s6_addr[10] = 0xFF;
-	ia->s6_addr[11] = 0xFF;
-	memcpy(ia->s6_addr + 12, buf, buf_len);
-    } else if ((AF_INET6 == family) && (sizeof(struct in6_addr) == buf_len)) {
-	memcpy(ia, buf, buf_len);
-    }
-}
-
-void
-allocate_anonymous_address(struct in6_addr *anon_addr,
-    const struct in6_addr *orig_addr)
+allocate_anonymous_address(inX_addr *anon_addr, const inX_addr *orig_addr)
 {
     static ip_list_t *list = NULL;
-    static uint32_t next_num = 0;
+    static int entropy_fd = -1;
     ip_list_t *ptr;
 
-    memset(anon_addr, 0, sizeof(struct in6_addr));
-
     for (ptr = list; ptr != NULL; ptr = ptr->next) {
-	if (cmp_in6_addr(orig_addr, &ptr->addr) == 0)
+	if (0 == inXaddr_cmp(orig_addr, &ptr->addr))
 	    break;
     }
 
+    if (-1 == entropy_fd) {
+	entropy_fd = open("/dev/urandom", 0);
+	if (-1 == entropy_fd) {
+	    entropy_fd = open("/dev/random", 0);
+	    if (-1 == entropy_fd) {
+		fprintf(stderr, "failed to open /dev/urandom or /dev/random");
+		exit(1);
+	    }
+	}
+    }
+
     if (ptr == NULL) {
-	ptr = (ip_list_t *) malloc(sizeof(ip_list_t) + sizeof(uint32_t));
+	char buf[16];
+	ptr = (ip_list_t *) malloc(sizeof(ip_list_t) + sizeof(inX_addr));
 	if (ptr == NULL)
 	    return;
-
 	ptr->addr = *orig_addr;
 	ptr->data = (void *)(ptr + 1);
-	*((uint32_t *) ptr->data) = next_num;
-	next_num++;
-
+	if (4 == inXaddr_version(orig_addr)) {
+		read(entropy_fd, buf, 4);
+		inXaddr_assign_v4(ptr->data, (struct in_addr *) buf);
+	} else {
+		read(entropy_fd, buf, 16);
+		inXaddr_assign_v6(ptr->data, (struct in6_addr *) buf);
+	}
 	ptr->next = list;
 	list = ptr;
     }
-    memcpy(anon_addr->s6_addr + 12, ptr->data, 4);
+    *anon_addr = *(inX_addr *) ptr->data;
 }
 
-int
-is_v4_in_v6(const struct in6_addr *addr)
-{
-    int i;
-    for (i = 0; i < 10; i++)
-	if (addr->s6_addr[i] != 0)
-	    return (0);
-    if ((addr->s6_addr[10] != 0xFF) || (addr->s6_addr[11] != 0xFF))
-	return (0);
-    return 1;
-}
-
-char *
-anon_inet_ntoa(const struct in6_addr *addr)
+const char *
+anon_inet_ntoa(const inX_addr *addr)
 {
     static char buffer[INET6_ADDRSTRLEN];
-    struct in6_addr anon_addr;
-
+    inX_addr anon_addr;
     if (anon_flag) {
 	allocate_anonymous_address(&anon_addr, addr);
 	addr = &anon_addr;
     }
-    if (is_v4_in_v6(addr)) {
-	struct in_addr v4addr;
-	memcpy(&v4addr.s_addr, addr->s6_addr + 12, 4);
-	if (inet_ntop(AF_INET, (const void *)&v4addr,
-		buffer, sizeof(buffer)) == NULL)
-	    return (NULL);
-    } else {
-	if (inet_ntop(AF_INET6, (const void *)addr,
-		buffer, sizeof(buffer)) == NULL)
-	    return (NULL);
-    }
-
-    return (buffer);
+    return inXaddr_ntop(addr, buffer, sizeof(buffer));
 }
 
 AgentAddr *
-AgentAddr_lookup_or_add(hashtbl * tbl, struct in6_addr *addr)
+AgentAddr_lookup_or_add(hashtbl * tbl, inX_addr *addr)
 {
     AgentAddr *x = hash_find(addr, tbl);
     if (NULL == x) {
@@ -435,9 +392,9 @@ static unsigned int
 stringaddr_hash(const void *p)
 {
     const StringAddr *sa = p;
-    unsigned int h1 = hashendian(sa->str, strlen(sa->str), 0);
-    unsigned int h2 = hashword((uint32_t *) & sa->addr, 1, h1);
-    return h2;
+    unsigned int h0 = inXaddr_hash(&sa->addr, 32);
+    unsigned int h1 = hashendian(sa->str, strlen(sa->str), h0);
+    return h1;
 }
 
 static int
@@ -445,14 +402,14 @@ stringaddr_cmp(const void *a, const void *b)
 {
     const StringAddr *A = a;
     const StringAddr *B = b;
-    int x = strcmp(A->str, B->str);
+    int x = inXaddr_cmp(&A->addr, &B->addr);
     if (x)
 	return x;
-    return cmp_in6_addr(&A->addr, &B->addr);
+    return strcmp(A->str, B->str);
 }
 
 StringAddrCounter *
-StringAddrCounter_lookup_or_add(hashtbl * tbl, const struct in6_addr *addr, const char *str)
+StringAddrCounter_lookup_or_add(hashtbl * tbl, const inX_addr *addr, const char *str)
 {
     StringAddr sa;
     StringAddrCounter *x;
@@ -482,14 +439,6 @@ SortItem_cmp(const void *A, const void *B)
     if (a->ptr > b->ptr)
 	return -1;
     return 0;
-}
-
-static unsigned int
-in_addr_hash(const void *key)
-{
-    if (is_v4_in_v6(key))
-	return hashword((uint32_t *) key + 3, 1, 0);
-    return hashword(key, 4, 0);
 }
 
 #define RFC1035_MAXLABELSZ 63
@@ -581,8 +530,8 @@ QnameToNld(const char *qname, int nld)
 
 int
 handle_dns(const char *buf, int len,
-    const struct in6_addr *src_addr,
-    const struct in6_addr *dst_addr)
+    const inX_addr *src_addr,
+    const inX_addr *dst_addr)
 {
     rfc1035_header qh;
     unsigned short us;
@@ -686,8 +635,8 @@ handle_dns(const char *buf, int len,
 
 int
 handle_udp(const struct udphdr *udp, int len,
-    const struct in6_addr *src_addr,
-    const struct in6_addr *dst_addr)
+    const inX_addr *src_addr,
+    const inX_addr *dst_addr)
 {
     if (port53 != udp->uh_dport && port53 != udp->uh_sport)
 	return 0;
@@ -703,8 +652,8 @@ handle_ipv6(struct ip6_hdr *ipv6, int len)
     int offset;
     int nexthdr;
 
-    struct in6_addr src_addr;
-    struct in6_addr dst_addr;
+    inX_addr src_addr;
+    inX_addr dst_addr;
     uint16_t payload_len;
 
     AgentAddr *agent;
@@ -714,8 +663,8 @@ handle_ipv6(struct ip6_hdr *ipv6, int len)
 
     offset = sizeof(struct ip6_hdr);
     nexthdr = ipv6->ip6_nxt;
-    src_addr = ipv6->ip6_src;
-    dst_addr = ipv6->ip6_dst;
+    inXaddr_assign_v6(&src_addr, &ipv6->ip6_src);
+    inXaddr_assign_v6(&dst_addr, &ipv6->ip6_dst);
     payload_len = ntohs(ipv6->ip6_plen);
 
     if (ignore_list_match(&src_addr))
@@ -785,8 +734,8 @@ handle_ipv4(const struct ip *ip, int len)
     int offset = ip->ip_hl << 2;
     AgentAddr *clt;
     AgentAddr *srv;
-    struct in6_addr src_addr;
-    struct in6_addr dst_addr;
+    inX_addr src_addr;
+    inX_addr dst_addr;
 
 #if USE_IPV6
     if (ip->ip_v == 6)
@@ -796,8 +745,8 @@ handle_ipv4(const struct ip *ip, int len)
     if (0 == opt_count_ipv4)
 	return 0;
 
-    in6_addr_from_buffer(&src_addr, &ip->ip_src.s_addr, sizeof(ip->ip_src.s_addr), AF_INET);
-    in6_addr_from_buffer(&dst_addr, &ip->ip_dst.s_addr, sizeof(ip->ip_dst.s_addr), AF_INET);
+    inXaddr_assign_v4(&src_addr, &ip->ip_src);
+    inXaddr_assign_v4(&dst_addr, &ip->ip_dst);
     if (ignore_list_match(&src_addr))
 	return (0);
 
@@ -1666,9 +1615,9 @@ ResetCounters(void)
 {
     int lvl;
     if (NULL == Sources)
-	Sources = hash_create(16384, in_addr_hash, cmp_in6_addr);
+	Sources = hash_create(16384, my_inXaddr_hash, my_inXaddr_cmp);
     if (NULL == Destinations)
-	Destinations = hash_create(16384, in_addr_hash, cmp_in6_addr);
+	Destinations = hash_create(16384, my_inXaddr_hash, my_inXaddr_cmp);
     for (lvl = 1; lvl <= max_level; lvl++) {
 	if (NULL != Domains[lvl])
 	    continue;
@@ -1736,8 +1685,6 @@ struct timeval last_progress = {0,0};
 void
 progress(pcap_t *p)
 {
-    struct stat sb;
-    off_t seek_cur;
     gettimeofday(&now, NULL);
     if (now.tv_sec == last_progress.tv_sec)
 	return;
@@ -1745,15 +1692,7 @@ progress(pcap_t *p)
     if (0 == wall_elapsed)
         return;
     double rate = (double)(query_count_total+reply_count_total) / wall_elapsed;
-    seek_cur = lseek(pcap_fileno(p), 0, SEEK_CUR);
-    if (fstat(pcap_fileno(p), &sb) < 0)
-	perror("fstat");
-    double x = (double) seek_cur / sb.st_size;
-    double eta = (1.0 - x) * wall_elapsed / x;
-    fprintf(stderr, "%7.1f m/s, (%lld, %lld), finished in %7.1f sec\n",
-		rate,
-		seek_cur, sb.st_size,
-		eta);
+    fprintf(stderr, "%7.1f m/s\n", rate);
     last_progress = now;
 }
 
