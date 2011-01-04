@@ -1,10 +1,10 @@
 PROG=dnstop
 DATE != date +%Y%m%d
 
-CC=@CC@
-CFLAGS=@CFLAGS@
-LIBS=@LIBS@
 OPTFLAGS=@OPTFLAGS@
+CC=@CC@
+CFLAGS=@CFLAGS@ ${OPTFLAGS}
+LIBS=@LIBS@
 
 prefix=@prefix@
 exec_prefix=@exec_prefix@
@@ -14,13 +14,14 @@ datadir=@datadir@
 mandir=@mandir@
 
 SRCS=	$(PROG).c \
-	hashtbl.c \
-	hashtbl.h \
+	hashtbl.c hashtbl.h \
+	inX_addr.c inX_addr.h \
 	known_tlds.h \
 	lookup3.c
 
 OBJS=	$(PROG).o \
 	hashtbl.o \
+	inX_addr.o \
 	lookup3.o
 
 all: $(PROG)
