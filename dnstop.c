@@ -223,13 +223,13 @@ void ResetCounters(void);
 void report(void);
 
 typedef struct {
-	unsigned short qtype;
-	unsigned short qclass;
-	const char *qname;
-	const inX_addr *src_addr;
-	const inX_addr *dst_addr;
-	unsigned char rcode;
-} FilterData;
+    unsigned short qtype;
+    unsigned short qclass;
+    const char *qname;
+    const inX_addr *src_addr;
+    const inX_addr *dst_addr;
+    unsigned char rcode;
+}      FilterData;
 
 typedef int Filter_t(FilterData *);
 Filter_t UnknownTldFilter;
@@ -241,17 +241,17 @@ Filter_t *Filter = NULL;
 unsigned int
 my_inXaddr_hash(const void *key)
 {
-	return inXaddr_hash(key, 24);
+    return inXaddr_hash(key, 24);
 }
 
 int
 my_inXaddr_cmp(const void *a, const void *b)
 {
-	return inXaddr_cmp(a, b);
+    return inXaddr_cmp(a, b);
 }
 
 int
-ignore_list_match(const inX_addr *addr)
+ignore_list_match(const inX_addr * addr)
 {
     ip_list_t *ptr;
 
@@ -262,7 +262,7 @@ ignore_list_match(const inX_addr *addr)
 }
 
 void
-ignore_list_add(const inX_addr *addr)
+ignore_list_add(const inX_addr * addr)
 {
     ip_list_t *new;
     if (ignore_list_match(addr) != 0)
@@ -290,7 +290,7 @@ ignore_list_add_name(const char *name)
     for (ai_ptr = ai_list; ai_ptr != NULL; ai_ptr = ai_ptr->ai_next) {
 	if (ai_ptr->ai_family == AF_INET) {
 	    inXaddr_assign_v4(&addr, &((struct sockaddr_in *)ai_ptr->ai_addr)->
-sin_addr);
+		sin_addr);
 	} else {
 	    inXaddr_assign_v6(&addr, &((struct sockaddr_in6 *)ai_ptr->ai_addr)->sin6_addr);
 	}
@@ -300,7 +300,7 @@ sin_addr);
 }
 
 void
-allocate_anonymous_address(inX_addr *anon_addr, const inX_addr *orig_addr)
+allocate_anonymous_address(inX_addr * anon_addr, const inX_addr * orig_addr)
 {
     static ip_list_t *list = NULL;
     static int entropy_fd = -1;
@@ -321,7 +321,6 @@ allocate_anonymous_address(inX_addr *anon_addr, const inX_addr *orig_addr)
 	    }
 	}
     }
-
     if (ptr == NULL) {
 	char buf[16];
 	ptr = (ip_list_t *) malloc(sizeof(ip_list_t) + sizeof(inX_addr));
@@ -330,11 +329,11 @@ allocate_anonymous_address(inX_addr *anon_addr, const inX_addr *orig_addr)
 	ptr->addr = *orig_addr;
 	ptr->data = (void *)(ptr + 1);
 	if (4 == inXaddr_version(orig_addr)) {
-		read(entropy_fd, buf, 4);
-		inXaddr_assign_v4(ptr->data, (struct in_addr *) buf);
+	    read(entropy_fd, buf, 4);
+	    inXaddr_assign_v4(ptr->data, (struct in_addr *)buf);
 	} else {
-		read(entropy_fd, buf, 16);
-		inXaddr_assign_v6(ptr->data, (struct in6_addr *) buf);
+	    read(entropy_fd, buf, 16);
+	    inXaddr_assign_v6(ptr->data, (struct in6_addr *)buf);
 	}
 	ptr->next = list;
 	list = ptr;
@@ -343,7 +342,7 @@ allocate_anonymous_address(inX_addr *anon_addr, const inX_addr *orig_addr)
 }
 
 const char *
-anon_inet_ntoa(const inX_addr *addr)
+anon_inet_ntoa(const inX_addr * addr)
 {
     static char buffer[INET6_ADDRSTRLEN];
     inX_addr anon_addr;
@@ -355,7 +354,7 @@ anon_inet_ntoa(const inX_addr *addr)
 }
 
 AgentAddr *
-AgentAddr_lookup_or_add(hashtbl * tbl, inX_addr *addr)
+AgentAddr_lookup_or_add(hashtbl * tbl, inX_addr * addr)
 {
     AgentAddr *x = hash_find(addr, tbl);
     if (NULL == x) {
@@ -412,7 +411,7 @@ stringaddr_cmp(const void *a, const void *b)
 }
 
 StringAddrCounter *
-StringAddrCounter_lookup_or_add(hashtbl * tbl, const inX_addr *addr, const char *str)
+StringAddrCounter_lookup_or_add(hashtbl * tbl, const inX_addr * addr, const char *str)
 {
     StringAddr sa;
     StringAddrCounter *x;
@@ -533,8 +532,8 @@ QnameToNld(const char *qname, int nld)
 
 int
 handle_dns(const char *buf, int len,
-    const inX_addr *src_addr,
-    const inX_addr *dst_addr)
+    const inX_addr * src_addr,
+    const inX_addr * dst_addr)
 {
     rfc1035_header qh;
     unsigned short us;
@@ -610,20 +609,19 @@ handle_dns(const char *buf, int len,
 	if (0 == Filter(&fd))
 	    return 0;
     }
-
     /* gather stats */
     qtype_counts[qtype]++;
     qclass_counts[qclass]++;
     opcode_counts[qh.opcode]++;
     if (opt_count_replies)
-        rcode_counts[qh.rcode]++;
+	rcode_counts[qh.rcode]++;
 
     for (lvl = 1; lvl <= max_level; lvl++) {
 	s = QnameToNld(qname, lvl);
 	sc = StringCounter_lookup_or_add(Domains[lvl], s);
 	sc->count++;
 	if (opt_count_domsrc) {
-    	    StringAddrCounter *ssc;
+	    StringAddrCounter *ssc;
 	    ssc = StringAddrCounter_lookup_or_add(DomSrcs[lvl], src_addr, s);
 	    ssc->count++;
 	}
@@ -641,8 +639,8 @@ handle_dns(const char *buf, int len,
 
 int
 handle_udp(const struct udphdr *udp, int len,
-    const inX_addr *src_addr,
-    const inX_addr *dst_addr)
+    const inX_addr * src_addr,
+    const inX_addr * dst_addr)
 {
     if (port53 != udp->uh_dport && port53 != udp->uh_sport)
 	return 0;
@@ -1538,7 +1536,7 @@ report(void)
 #include "known_tlds.h"
 
 int
-UnknownTldFilter(FilterData *fd)
+UnknownTldFilter(FilterData * fd)
 {
     const char *tld = QnameToNld(fd->qname, 1);
     unsigned int i;
@@ -1551,7 +1549,7 @@ UnknownTldFilter(FilterData *fd)
 }
 
 int
-AforAFilter(FilterData *fd)
+AforAFilter(FilterData * fd)
 {
     struct in_addr a;
     if (fd->qtype != T_A)
@@ -1560,7 +1558,7 @@ AforAFilter(FilterData *fd)
 }
 
 int
-RFC1918PtrFilter(FilterData *fd)
+RFC1918PtrFilter(FilterData * fd)
 {
     char *t;
     char q[128];
@@ -1587,7 +1585,7 @@ RFC1918PtrFilter(FilterData *fd)
 }
 
 int
-RcodeRefusedFilter(FilterData *fd)
+RcodeRefusedFilter(FilterData * fd)
 {
     return ns_r_refused == fd->rcode ? 1 : 0;
 }
@@ -1691,21 +1689,21 @@ pcap_select(pcap_t * p, int sec, int usec)
     return select(pcap_fileno(p) + 1, &R, NULL, NULL, &to);
 }
 
-struct timeval start = {0,0};
-struct timeval now = {0,0};
-struct timeval last_progress = {0,0};
+struct timeval start = {0, 0};
+struct timeval now = {0, 0};
+struct timeval last_progress = {0, 0};
 
 void
-progress(pcap_t *p)
+progress(pcap_t * p)
 {
-    unsigned int msgs = query_count_total+reply_count_total;
+    unsigned int msgs = query_count_total + reply_count_total;
     gettimeofday(&now, NULL);
     if (now.tv_sec == last_progress.tv_sec)
 	return;
     time_t wall_elapsed = now.tv_sec - start.tv_sec;
     if (0 == wall_elapsed)
-        return;
-    double rate = (double) msgs / wall_elapsed;
+	return;
+    double rate = (double)msgs / wall_elapsed;
     fprintf(stderr, "%u %7.1f m/s\n", msgs, rate);
     last_progress = now;
 }
@@ -1916,7 +1914,7 @@ main(int argc, char *argv[])
 	endwin();		/* klin, Thu Nov 28 08:56:51 2002 */
     } else {
 	while (pcap_dispatch(pcap, 1, handle_pcap, NULL)) {
-	    if (progress_flag && 0 == ((query_count_total+reply_count_total) & 0x3ff))
+	    if (progress_flag && 0 == ((query_count_total + reply_count_total) & 0x3ff))
 		progress(pcap);
 	}
 	cron_pre();
