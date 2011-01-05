@@ -153,6 +153,7 @@ int opt_count_queries = 0;
 int opt_count_replies = 0;
 int opt_count_ipv4 = 0;
 int opt_count_ipv6 = 0;
+int opt_count_domsrc = 1;
 
 /*
  * flags/features for non-interactive mode
@@ -545,7 +546,6 @@ handle_dns(const char *buf, int len,
     const char *s;
     int x;
     StringCounter *sc;
-    StringAddrCounter *ssc;
     int lvl;
 
     if (len < sizeof(qh))
@@ -615,14 +615,18 @@ handle_dns(const char *buf, int len,
     qtype_counts[qtype]++;
     qclass_counts[qclass]++;
     opcode_counts[qh.opcode]++;
-    rcode_counts[qh.rcode]++;
+    if (opt_count_replies)
+        rcode_counts[qh.rcode]++;
 
     for (lvl = 1; lvl <= max_level; lvl++) {
 	s = QnameToNld(qname, lvl);
 	sc = StringCounter_lookup_or_add(Domains[lvl], s);
 	sc->count++;
-	ssc = StringAddrCounter_lookup_or_add(DomSrcs[lvl], src_addr, s);
-	ssc->count++;
+	if (opt_count_domsrc) {
+    	    StringAddrCounter *ssc;
+	    ssc = StringAddrCounter_lookup_or_add(DomSrcs[lvl], src_addr, s);
+	    ssc->count++;
+	}
     }
 
     if (0 == qh.qr) {
@@ -1469,6 +1473,10 @@ StringAddrCounter_report(hashtbl * tbl, char *what1, char *what2)
 void
 DomSrc_report(void)
 {
+    if (0 == opt_count_domsrc) {
+	print_func("\tReport disabled\n");
+	return;
+    }
     if (cur_level > max_level) {
 	print_func("\tYou must start %s with -l %d\n", progname, cur_level);
 	print_func("\tto collect this level of domain stats.\n", progname);
@@ -1624,7 +1632,8 @@ ResetCounters(void)
 	if (NULL != Domains[lvl])
 	    continue;
 	Domains[lvl] = hash_create(hash_buckets, string_hash, string_cmp);
-	DomSrcs[lvl] = hash_create(hash_buckets, stringaddr_hash, stringaddr_cmp);
+	if (opt_count_domsrc)
+	    DomSrcs[lvl] = hash_create(hash_buckets, stringaddr_hash, stringaddr_cmp);
     }
     query_count_intvl = 0;
     query_count_total = 0;
@@ -1638,7 +1647,8 @@ ResetCounters(void)
     hash_free(Destinations, free);
     for (lvl = 1; lvl <= max_level; lvl++) {
 	hash_free(Domains[lvl], free);
-	hash_free(DomSrcs[lvl], StringAddrCounter_free);
+	if (opt_count_domsrc)
+	    hash_free(DomSrcs[lvl], StringAddrCounter_free);
     }
     memset(&last_ts, '\0', sizeof(last_ts));
 }
@@ -1716,7 +1726,7 @@ main(int argc, char *argv[])
     progname = strdup(strrchr(argv[0], '/') ? strchr(argv[0], '/') + 1 : argv[0]);
     srandom(time(NULL));
 
-    while ((x = getopt(argc, argv, "46ab:B:f:i:l:pPr:QRvV")) != -1) {
+    while ((x = getopt(argc, argv, "46ab:B:f:i:l:pPr:QRvVX")) != -1) {
 	switch (x) {
 	case '4':
 	    opt_count_ipv4 = 1;
@@ -1770,6 +1780,9 @@ main(int argc, char *argv[])
 	    fprintf(stderr, "dnstop Version: %s\n", Version);
 	    fprintf(stderr, "http://dnstop.measurement-factory.com/\n");
 	    exit(0);
+	case 'X':
+	    opt_count_domsrc = 0;
+	    break;
 	default:
 	    usage();
 	    break;
@@ -1920,7 +1933,7 @@ main(int argc, char *argv[])
 	    print_func("\n");
 	    Domain_report();
 	}
-	for (cur_level = 1; cur_level <= max_level; cur_level++) {
+	for (cur_level = 1; opt_count_domsrc && cur_level <= max_level; cur_level++) {
 	    print_func("\n");
 	    DomSrc_report();
 	}

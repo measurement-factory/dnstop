@@ -94,6 +94,9 @@ Print "progress" messages on stderr when in non-interactive mode.
 Use
 .Pa buckets
 hash table buckets.
+.It Fl X
+Do not tabulate the sources + query name counters.  This can significantly
+reduce memory usage on busy servers and large savefiles.
 .It Ar savefile
 a captured network trace in 
 .Cm pcap
