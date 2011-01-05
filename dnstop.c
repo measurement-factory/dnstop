@@ -163,6 +163,7 @@ typedef int (printer) (const char *,...);
 printer *print_func = (printer *) printw;
 
 typedef const char *(col_fmt) (const SortItem *);
+typedef char *(strify) (unsigned int);
 
 #define T_MAX 65536
 #ifndef T_A6
@@ -194,14 +195,17 @@ unsigned int query_count_intvl = 0;
 unsigned int query_count_total = 0;
 unsigned int reply_count_intvl = 0;
 unsigned int reply_count_total = 0;
+
 int qtype_counts[T_MAX];
 int opcode_counts[OP_MAX];
 int rcode_counts[RC_MAX];
 int qclass_counts[C_MAX];
+
 hashtbl *Sources = NULL;
 hashtbl *Destinations = NULL;
 hashtbl *Domains[10];
 hashtbl *DomSrcs[10];
+
 #ifdef HAVE_STRUCT_BPF_TIMEVAL
 struct bpf_timeval last_ts;
 #else
@@ -209,6 +213,12 @@ struct timeval last_ts;
 #endif
 time_t report_interval = 1;
 
+/*
+ * These hold "%d" printfed strings for non-standard types/codes
+ */
+static char *qtypes_buf[T_MAX];
+static char *rcodes_buf[RC_MAX];
+static char *opcodes_buf[OP_MAX];
 
 /* Prototypes */
 void Sources_report(void);
@@ -610,23 +620,24 @@ handle_dns(const char *buf, int len,
 	    return 0;
     }
     /* gather stats */
-    qtype_counts[qtype]++;
-    qclass_counts[qclass]++;
-    opcode_counts[qh.opcode]++;
-    if (opt_count_replies)
+    if (0 == opt_count_replies || 1 == qh.qr) {
 	rcode_counts[qh.rcode]++;
-
-    for (lvl = 1; lvl <= max_level; lvl++) {
-	s = QnameToNld(qname, lvl);
-	sc = StringCounter_lookup_or_add(Domains[lvl], s);
-	sc->count++;
-	if (opt_count_domsrc) {
-	    StringAddrCounter *ssc;
-	    ssc = StringAddrCounter_lookup_or_add(DomSrcs[lvl], src_addr, s);
-	    ssc->count++;
+    }
+    if (0 == opt_count_queries || 0 == qh.qr) {
+	qtype_counts[qtype]++;
+	qclass_counts[qclass]++;
+	opcode_counts[qh.opcode]++;
+	for (lvl = 1; lvl <= max_level; lvl++) {
+	    s = QnameToNld(qname, lvl);
+	    sc = StringCounter_lookup_or_add(Domains[lvl], s);
+	    sc->count++;
+	    if (opt_count_domsrc) {
+		StringAddrCounter *ssc;
+		ssc = StringAddrCounter_lookup_or_add(DomSrcs[lvl], src_addr, s);
+		ssc->count++;
+	    }
 	}
     }
-
     if (0 == qh.qr) {
 	query_count_intvl++;
 	query_count_total++;
@@ -1058,9 +1069,9 @@ Help_report(void)
 }
 
 char *
-qtype_str(int t)
+qtype_str(unsigned int t)
 {
-    static char buf[30];
+    char buf[30];
     switch (t) {
     case T_A:
 	return "A?";
@@ -1120,14 +1131,16 @@ qtype_str(int t)
 	return "ANY?";
 	break;
     default:
-	snprintf(buf, 30, "#%d?", t);
-	return buf;
+	if (qtypes_buf[t])
+	    return qtypes_buf[t];
+	snprintf(buf, sizeof(buf), "#%hu?", t);
+	return qtypes_buf[t] = strdup(buf);
     }
     /* NOTREACHED */
 }
 
 char *
-opcode_str(int o)
+opcode_str(unsigned int o)
 {
     static char buf[30];
     switch (o) {
@@ -1147,14 +1160,16 @@ opcode_str(int o)
 	return "Update";
 	break;
     default:
+	if (opcodes_buf[o])
+	    return opcodes_buf[o];
 	snprintf(buf, 30, "Opcode%d", o);
-	return buf;
+	return opcodes_buf[o] = strdup(buf);
     }
     /* NOTREACHED */
 }
 
 char *
-rcode_str(int r)
+rcode_str(unsigned int r)
 {
     static char buf[30];
     switch (r) {
@@ -1192,8 +1207,10 @@ rcode_str(int r)
 	return "Notzone";
 	break;
     default:
+	if (rcodes_buf[r])
+	    return rcodes_buf[r];
 	snprintf(buf, 30, "Rcode%d", r);
-	return buf;
+	return rcodes_buf[r] = strdup(buf);
     }
     /* NOTREACHED */
 }
@@ -1247,6 +1264,7 @@ Table_report(SortItem * sorted, int rows, const char *col1, const char *col2, co
     int ncols = get_ncols();
     char fmt1[64];
     char fmt2[64];
+    unsigned int sum = 0;
 
     if (nlines > rows)
 	nlines = rows;
@@ -1256,20 +1274,22 @@ Table_report(SortItem * sorted, int rows, const char *col1, const char *col2, co
 	if (W1 < strlen(t))
 	    W1 = strlen(t);
     }
-    if (W1 + 1 + WC + 1 + WP + 1 > ncols)
-	W1 = ncols - 1 - WC - 1 - WP - 1;
+    if (W1 + 1 + WC + 1 + WP + 1 + WP + 1 > ncols)
+	W1 = ncols - 1 - WC - 1 - WP - 1 - WP - 1;
 
     if (NULL == col2 || NULL == F2) {
-	snprintf(fmt1, 64, "%%-%d.%ds %%%ds %%%ds\n", W1, W1, WC, WP);
-	snprintf(fmt2, 64, "%%-%d.%ds %%%dd %%%d.1f\n", W1, W1, WC, WP);
-	print_func(fmt1, col1, "Count", "%");
-	print_func(fmt1, dashes(W1), dashes(WC), dashes(WP));
+	snprintf(fmt1, 64, "%%-%d.%ds %%%ds %%%ds %%%ds\n", W1, W1, WC, WP, WP);
+	snprintf(fmt2, 64, "%%-%d.%ds %%%dd %%%d.1f %%%d.1f\n", W1, W1, WC, WP, WP);
+	print_func(fmt1, col1, "Count", "%", "cum%");
+	print_func(fmt1, dashes(W1), dashes(WC), dashes(WP), dashes(WP));
 	for (i = 0; i < nlines; i++) {
+	    sum += (sorted + i)->cnt;
 	    const char *t = F1(sorted + i);
 	    print_func(fmt2,
 		t,
 		(sorted + i)->cnt,
-		100.0 * (sorted + i)->cnt / base);
+		100.0 * (sorted + i)->cnt / base,
+		100.0 * sum / base);
 	}
     } else {
 	for (i = 0; i < nlines; i++) {
@@ -1277,20 +1297,22 @@ Table_report(SortItem * sorted, int rows, const char *col1, const char *col2, co
 	    if (W2 < strlen(t))
 		W2 = strlen(t);
 	}
-	if (W2 + 1 + W1 + 1 + WC + 1 + WP + 1 > ncols)
-	    W2 = ncols - 1 - W1 - 1 - WC - 1 - WP - 1;
-	snprintf(fmt1, 64, "%%-%d.%ds %%-%d.%ds %%%ds %%%ds\n", W1, W1, W2, W2, WC, WP);
-	snprintf(fmt2, 64, "%%-%d.%ds %%-%d.%ds %%%dd %%%d.1f\n", W1, W1, W2, W2, WC, WP);
-	print_func(fmt1, col1, col2, "Count", "%");
-	print_func(fmt1, dashes(W1), dashes(W2), dashes(WC), dashes(WP));
+	if (W2 + 1 + W1 + 1 + WC + 1 + WP + 1 + WP + 1 > ncols)
+	    W2 = ncols - 1 - W1 - 1 - WC - 1 - WP - 1 - WP - 1;
+	snprintf(fmt1, 64, "%%-%d.%ds %%-%d.%ds %%%ds %%%ds %%%ds\n", W1, W1, W2, W2, WC, WP, WP);
+	snprintf(fmt2, 64, "%%-%d.%ds %%-%d.%ds %%%dd %%%d.1f %%%d.1f\n", W1, W1, W2, W2, WC, WP, WP);
+	print_func(fmt1, col1, col2, "Count", "%", "cum%");
+	print_func(fmt1, dashes(W1), dashes(W2), dashes(WC), dashes(WP), dashes(WP));
 	for (i = 0; i < nlines; i++) {
 	    const char *t = F1(sorted + i);
 	    const char *q = F2(sorted + i);
+	    sum += (sorted + i)->cnt;
 	    print_func(fmt2,
 		t,
 		q,
 		(sorted + i)->cnt,
-		100.0 * (sorted + i)->cnt / base);
+		100.0 * (sorted + i)->cnt / base,
+		100.0 * sum / base);
 	}
     }
 }
@@ -1298,12 +1320,14 @@ Table_report(SortItem * sorted, int rows, const char *col1, const char *col2, co
 void
 StringCounter_report(hashtbl * tbl, char *what)
 {
+    unsigned int sum = 0;
     int sortsize = hash_count(tbl);
     SortItem *sortme = calloc(sortsize, sizeof(SortItem));
     StringCounter *sc;
     hash_iter_init(tbl);
     sortsize = 0;
     while ((sc = hash_iterate(tbl))) {
+	sum += sc->count;
 	sortme[sortsize].cnt = sc->count;
 	sortme[sortsize].ptr = sc;
 	sortsize++;
@@ -1312,7 +1336,7 @@ StringCounter_report(hashtbl * tbl, char *what)
     Table_report(sortme, sortsize,
 	what, NULL,
 	StringCounter_col_fmt, NULL,
-	query_count_total + reply_count_total);
+	sum);
     free(sortme);
 }
 
@@ -1341,66 +1365,44 @@ Qtype_col_fmt(const SortItem * si)
 }
 
 void
-Qtypes_report(void)
+Simple_report(unsigned int a[], unsigned int max, const char *name, strify * to_str)
 {
-    int type;
-    SortItem *sortme = calloc(T_MAX, sizeof(SortItem));
-    int sortsize = 0;
-    for (type = 0; type < T_MAX; type++) {
-	if (0 == qtype_counts[type])
+    unsigned int i;
+    unsigned int sum = 0;
+    unsigned int sortsize = 0;
+    SortItem *sortme = calloc(max, sizeof(SortItem));
+    for (i = 0; i < max; i++) {
+	if (0 == a[i])
 	    continue;
-	sortme[sortsize].cnt = qtype_counts[type];
-	sortme[sortsize].ptr = qtype_str(type);	/* XXX danger */
+	sum += a[i];
+	sortme[sortsize].cnt = a[i];
+	sortme[sortsize].ptr = to_str(i);
 	sortsize++;
     }
     qsort(sortme, sortsize, sizeof(SortItem), SortItem_cmp);
     Table_report(sortme, sortsize,
-	"Query Type", NULL,
+	name, NULL,
 	Qtype_col_fmt, NULL,
-	query_count_total + reply_count_total);
+	sum);
     free(sortme);
+}
+
+void
+Qtypes_report(void)
+{
+    Simple_report(qtype_counts, T_MAX, "Query Type", qtype_str);
 }
 
 void
 Opcodes_report(void)
 {
-    int op;
-    SortItem *sortme = calloc(OP_MAX, sizeof(SortItem));
-    int sortsize = 0;
-    for (op = 0; op < OP_MAX; op++) {
-	if (0 == opcode_counts[op])
-	    continue;
-	sortme[sortsize].cnt = opcode_counts[op];
-	sortme[sortsize].ptr = opcode_str(op);	/* XXX danger */
-	sortsize++;
-    }
-    qsort(sortme, sortsize, sizeof(SortItem), SortItem_cmp);
-    Table_report(sortme, sortsize,
-	"Opcode", NULL,
-	Qtype_col_fmt, NULL,
-	query_count_total + reply_count_total);
-    free(sortme);
+    Simple_report(opcode_counts, OP_MAX, "Opcode", opcode_str);
 }
 
 void
 Rcodes_report(void)
 {
-    int rc;
-    SortItem *sortme = calloc(OP_MAX, sizeof(SortItem));
-    int sortsize = 0;
-    for (rc = 0; rc < RC_MAX; rc++) {
-	if (0 == rcode_counts[rc])
-	    continue;
-	sortme[sortsize].cnt = rcode_counts[rc];
-	sortme[sortsize].ptr = rcode_str(rc);	/* XXX danger */
-	sortsize++;
-    }
-    qsort(sortme, sortsize, sizeof(SortItem), SortItem_cmp);
-    Table_report(sortme, sortsize,
-	"Rcode", NULL,
-	Qtype_col_fmt, NULL,
-	query_count_total + reply_count_total);
-    free(sortme);
+    Simple_report(rcode_counts, RC_MAX, "Rcode", rcode_str);
 }
 
 const char *
@@ -1413,12 +1415,14 @@ AgentAddr_col_fmt(const SortItem * si)
 void
 AgentAddr_report(hashtbl * tbl, const char *what)
 {
+    unsigned int sum = 0;
     int sortsize = hash_count(tbl);
     SortItem *sortme = calloc(sortsize, sizeof(SortItem));
     AgentAddr *a;
     hash_iter_init(tbl);
     sortsize = 0;
     while ((a = hash_iterate(tbl))) {
+	sum += a->count;
 	sortme[sortsize].cnt = a->count;
 	sortme[sortsize].ptr = a;
 	sortsize++;
@@ -1427,7 +1431,7 @@ AgentAddr_report(hashtbl * tbl, const char *what)
     Table_report(sortme, sortsize,
 	what, NULL,
 	AgentAddr_col_fmt, NULL,
-	query_count_total + reply_count_total);
+	sum);
     free(sortme);
 }
 
@@ -1450,12 +1454,14 @@ StringAddr_col2_fmt(const SortItem * si)
 void
 StringAddrCounter_report(hashtbl * tbl, char *what1, char *what2)
 {
+    unsigned int sum = 0;
     int sortsize = hash_count(tbl);
     SortItem *sortme = calloc(sortsize, sizeof(SortItem));
     StringAddrCounter *ssc;
     hash_iter_init(tbl);
     sortsize = 0;
     while ((ssc = hash_iterate(tbl))) {
+	sum += ssc->count;
 	sortme[sortsize].cnt = ssc->count;
 	sortme[sortsize].ptr = ssc;
 	sortsize++;
@@ -1464,7 +1470,7 @@ StringAddrCounter_report(hashtbl * tbl, char *what1, char *what2)
     Table_report(sortme, sortsize,
 	what1, what2,
 	StringAddr_col1_fmt, StringAddr_col2_fmt,
-	query_count_total + reply_count_total);
+	sum);
     free(sortme);
 }
 
@@ -1637,10 +1643,10 @@ ResetCounters(void)
     query_count_total = 0;
     reply_count_intvl = 0;
     reply_count_total = 0;
-    memset(qtype_counts, '\0', sizeof(qtype_counts));
-    memset(qclass_counts, '\0', sizeof(qclass_counts));
-    memset(opcode_counts, '\0', sizeof(opcode_counts));
-    memset(rcode_counts, '\0', sizeof(rcode_counts));
+    memset(qtype_counts, 0, sizeof(qtype_counts));
+    memset(qclass_counts, 0, sizeof(qclass_counts));
+    memset(opcode_counts, 0, sizeof(opcode_counts));
+    memset(rcode_counts, 0, sizeof(rcode_counts));
     hash_free(Sources, free);
     hash_free(Destinations, free);
     for (lvl = 1; lvl <= max_level; lvl++) {
@@ -1723,6 +1729,9 @@ main(int argc, char *argv[])
     SubReport = Sources_report;
     progname = strdup(strrchr(argv[0], '/') ? strchr(argv[0], '/') + 1 : argv[0]);
     srandom(time(NULL));
+    memset(qtypes_buf, 0, sizeof(qtypes_buf));
+    memset(rcodes_buf, 0, sizeof(rcodes_buf));
+    memset(opcodes_buf, 0, sizeof(opcodes_buf));
 
     while ((x = getopt(argc, argv, "46ab:B:f:i:l:pPr:QRvVX")) != -1) {
 	switch (x) {
