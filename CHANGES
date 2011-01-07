@@ -1,3 +1,23 @@
+2011/01/05 Duane Wessels
+
+    Found a fixed a few problems after spending some quality time
+    looking at the code.
+
+    1) Hash table performance was terrible and has been improved.
+       The hash table size is now configurable via command line
+       option.
+
+    2) Some things were double-counted when both -Q and -R were
+       given.
+
+    3) Added cumulative percentage totals to the tables
+
+    4) Added -X option to disable the source+queryname tables, which
+       could consume a lot of memory.
+
+    5) Imported "inX_addr" mini-library for storing IPv4/IPv6
+       addresses.
+
 2010/12/27 Duane Wessels
 
     Fixed a bug where if stdout was a TTY but stdin was not a TTY,
