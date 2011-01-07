@@ -86,7 +86,7 @@ The "refused" filter, when used with the
 .Fl R
 option, tells
 .Nm
-to count only responses with rcode REFUSED.
+to count only replies with rcode REFUSED.
 .\"
 .It Fl P
 Print "progress" messages on stderr when in non-interactive mode.
@@ -114,6 +114,8 @@ display the source address table
 display the destination address table
 .It t
 display the breakdown of query types seen
+.It r
+display the breakdown of response codes seen
 .It o
 display the breakdown of opcodes seen
 .It 1
@@ -170,6 +172,35 @@ supply a savefile for reading, instead of capturing
 live packets.  After reading the entire savefile,
 .Nm
 prints the top 50 entries for each table.
+.Pp
+.Sh HOW MESSAGES ARE COUNTED
+By default
+.Nm
+examines only query messages and ignores replies.  In this case the response code
+table is meaningless and will likely show 100% "Noerror."
+.Pp
+If you supply (only) the
+.Fl R
+command line option,
+.Nm
+examines replies and ignores queries.  This allows you to see meaningful
+response code values, as well as all the other tables.  In this case
+all the query attributes (such as type and name) are taken from the
+Question section of the reply.
+.Pp
+Note, however, that it is common for a stream of DNS messages to contain
+more queries than replies.
+This could happen, for example,
+if the server is too busy to respond to every single query, or if
+the server is designed to ignore malformed query messages.  Therefore,
+you might want to examine both queries and replies by giving both
+.Fl R
+and
+.Fl Q
+command line options.  In this case, only the response code counts 
+are taken from the replies and all other attributes
+are taken from the queries.
+.Pp
 .Sh AUTHORS
 .Bl -tag -width xx -compact
 .It Pa Duane Wessels (wessels@measurement-factory.com)
