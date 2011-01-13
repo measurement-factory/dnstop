@@ -7,10 +7,11 @@
  * reserved.  See the LICENSE file for details.
  */
 
+#include "config.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <assert.h>
-#ifdef __linux__
+#if HAVE_STDINT_H
 #include <stdint.h>
 #endif
 #include "hashtbl.h"
