@@ -301,10 +301,14 @@ ignore_list_add_name(const char *name)
 	if (ai_ptr->ai_family == AF_INET) {
 	    inXaddr_assign_v4(&addr, &((struct sockaddr_in *)ai_ptr->ai_addr)->
 		sin_addr);
-	} else {
-	    inXaddr_assign_v6(&addr, &((struct sockaddr_in6 *)ai_ptr->ai_addr)->sin6_addr);
+	    ignore_list_add(&addr);
 	}
-	ignore_list_add(&addr);
+#if USE_IPV6
+	else if (ai_ptr->ai_family == AF_INET6) {
+	    inXaddr_assign_v6(&addr, &((struct sockaddr_in6 *)ai_ptr->ai_addr)->sin6_addr);
+	    ignore_list_add(&addr);
+	}
+#endif
     }
     freeaddrinfo(ai_list);
 }
@@ -341,10 +345,13 @@ allocate_anonymous_address(inX_addr * anon_addr, const inX_addr * orig_addr)
 	if (4 == inXaddr_version(orig_addr)) {
 	    read(entropy_fd, buf, 4);
 	    inXaddr_assign_v4(ptr->data, (struct in_addr *)buf);
-	} else {
+	}
+#if USE_IPV6
+	else {
 	    read(entropy_fd, buf, 16);
 	    inXaddr_assign_v6(ptr->data, (struct in6_addr *)buf);
 	}
+#endif
 	ptr->next = list;
 	list = ptr;
     }
