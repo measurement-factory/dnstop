@@ -154,6 +154,7 @@ int opt_count_replies = 0;
 int opt_count_ipv4 = 0;
 int opt_count_ipv6 = 0;
 int opt_count_domsrc = 1;
+const char *opt_filter_by_name = 0;
 
 /*
  * flags/features for non-interactive mode
@@ -246,6 +247,7 @@ Filter_t UnknownTldFilter;
 Filter_t AforAFilter;
 Filter_t RFC1918PtrFilter;
 Filter_t RcodeRefusedFilter;
+Filter_t QnameFilter;
 Filter_t *Filter = NULL;
 
 unsigned int
@@ -1603,6 +1605,23 @@ RcodeRefusedFilter(FilterData * fd)
     return REFUSED == fd->rcode ? 1 : 0;
 }
 
+int
+QnameFilter(FilterData * fd)
+{
+    const char *F = opt_filter_by_name;
+    const char *Q = fd->qname;
+    size_t fo = strlen(F);
+    size_t qo = strlen(Q);
+    while (qo && fo && tolower(Q[--qo]) == tolower(F[--fo]));
+    if (fo)
+	return 0;		/* didn't match all of opt_filter_by_name */
+    if (0 == qo)
+	return 1;		/* exact match */
+    if ('.' == Q[qo - 1])
+	return 1;		/* matched on domain boundary */
+    return 0;
+}
+
 void
 set_filter(const char *fn)
 {
@@ -1614,6 +1633,8 @@ set_filter(const char *fn)
 	Filter = RFC1918PtrFilter;
     else if (0 == strcmp(fn, "refused"))
 	Filter = RcodeRefusedFilter;
+    else if (0 == strcmp(fn, "qname"))
+	Filter = QnameFilter;
     else
 	Filter = NULL;
 }
@@ -1740,7 +1761,7 @@ main(int argc, char *argv[])
     memset(rcodes_buf, 0, sizeof(rcodes_buf));
     memset(opcodes_buf, 0, sizeof(opcodes_buf));
 
-    while ((x = getopt(argc, argv, "46ab:B:f:i:l:pPr:QRvVX")) != -1) {
+    while ((x = getopt(argc, argv, "46ab:B:f:i:l:n:pPr:QRvVX")) != -1) {
 	switch (x) {
 	case '4':
 	    opt_count_ipv4 = 1;
@@ -1761,6 +1782,10 @@ main(int argc, char *argv[])
 	    max_level = atoi(optarg);
 	    if (max_level < 1 || max_level > 9)
 		usage();
+	    break;
+	case 'n':
+	    opt_filter_by_name = strdup(optarg);
+	    set_filter("qname");
 	    break;
 	case 'p':
 	    promisc_flag = 0;
