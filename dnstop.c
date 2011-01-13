@@ -1600,7 +1600,7 @@ RFC1918PtrFilter(FilterData * fd)
 int
 RcodeRefusedFilter(FilterData * fd)
 {
-    return ns_r_refused == fd->rcode ? 1 : 0;
+    return REFUSED == fd->rcode ? 1 : 0;
 }
 
 void
