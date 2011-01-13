@@ -1874,12 +1874,12 @@ main(int argc, char *argv[])
     /*
      * non-blocking call added for Mac OS X bugfix.  Sent by Max Horn. ref
      * http://www.tcpdump.org/lists/workers/2002/09/msg00033.html
+     *
+     * UPDATE: pcap_setnonblock fails on OpenBSD.  Since this was a MacOS
+     * workaround and dnstop does not require non-blocking, we'll won't
+     * check the return status.
      */
-    x = pcap_setnonblock(pcap, 1, errbuf);
-    if (x < 0) {
-	fprintf(stderr, "pcap_setnonblock failed: %s\n", errbuf);
-	exit(1);
-    }
+    pcap_setnonblock(pcap, 1, errbuf);
     switch (pcap_datalink(pcap)) {
     case DLT_EN10MB:
 	handle_datalink = handle_ether;
