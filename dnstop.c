@@ -373,7 +373,7 @@ anon_inet_ntoa(const inX_addr * addr)
 }
 
 AgentAddr *
-AgentAddr_lookup_or_add(hashtbl * tbl, inX_addr * addr)
+AgentAddr_lookup_or_add(hashtbl * tbl, const inX_addr * addr)
 {
     AgentAddr *x = hash_find(addr, tbl);
     if (NULL == x) {
@@ -564,6 +564,7 @@ handle_dns(const char *buf, int len,
     const char *s;
     int x;
     StringCounter *sc;
+    AgentAddr *agent;
     int lvl;
 
     if (len < sizeof(qh))
@@ -631,11 +632,15 @@ handle_dns(const char *buf, int len,
     /* gather stats */
     if (0 == opt_count_replies || 1 == qh.qr) {
 	rcode_counts[qh.rcode]++;
+        if ((agent = AgentAddr_lookup_or_add(Destinations, dst_addr)) != NULL)
+	    agent->count++;
     }
     if (0 == opt_count_queries || 0 == qh.qr) {
 	qtype_counts[qtype]++;
 	qclass_counts[qclass]++;
 	opcode_counts[qh.opcode]++;
+        if ((agent = AgentAddr_lookup_or_add(Sources, src_addr)) != NULL)
+	    agent->count++;
 	for (lvl = 1; lvl <= max_level; lvl++) {
 	    s = QnameToNld(qname, lvl);
 	    sc = StringCounter_lookup_or_add(Domains[lvl], s);
@@ -680,7 +685,6 @@ handle_ipv6(struct ip6_hdr *ipv6, int len)
     inX_addr dst_addr;
     uint16_t payload_len;
 
-    AgentAddr *agent;
 
     if (0 == opt_count_ipv6)
 	return 0;
@@ -742,11 +746,6 @@ handle_ipv6(struct ip6_hdr *ipv6, int len)
     if (handle_udp((struct udphdr *)((char *)ipv6 + offset), payload_len, &src_addr, &dst_addr) == 0)
 	return (0);
 
-    if ((agent = AgentAddr_lookup_or_add(Sources, &src_addr)) != NULL)
-	agent->count++;
-    if ((agent = AgentAddr_lookup_or_add(Destinations, &dst_addr)) != NULL)
-	agent->count++;
-
     return (1);			/* Success */
 }
 #endif
@@ -756,8 +755,6 @@ int
 handle_ipv4(const struct ip *ip, int len)
 {
     int offset = ip->ip_hl << 2;
-    AgentAddr *clt;
-    AgentAddr *srv;
     inX_addr src_addr;
     inX_addr dst_addr;
 
@@ -778,10 +775,6 @@ handle_ipv4(const struct ip *ip, int len)
 	return 0;
     if (0 == handle_udp((struct udphdr *)((char *)ip + offset), len - offset, &src_addr, &dst_addr))
 	return 0;
-    clt = AgentAddr_lookup_or_add(Sources, &src_addr);
-    clt->count++;
-    srv = AgentAddr_lookup_or_add(Destinations, &dst_addr);
-    srv->count++;
     return 1;
 }
 
