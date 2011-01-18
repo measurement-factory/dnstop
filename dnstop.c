@@ -1605,7 +1605,9 @@ QnameFilter(FilterData * fd)
     const char *Q = fd->qname;
     size_t fo = strlen(F);
     size_t qo = strlen(Q);
-    while (qo && fo && tolower(Q[--qo]) == tolower(F[--fo]));
+    while (qo && fo)
+	if (tolower(Q[--qo]) != tolower(F[--fo]))
+	    return 1;
     if (fo)
 	return 0;		/* didn't match all of opt_filter_by_name */
     if (0 == qo)
