@@ -1607,7 +1607,7 @@ QnameFilter(FilterData * fd)
     size_t qo = strlen(Q);
     while (qo && fo)
 	if (tolower(Q[--qo]) != tolower(F[--fo]))
-	    return 1;
+	    return 0;
     if (fo)
 	return 0;		/* didn't match all of opt_filter_by_name */
     if (0 == qo)
