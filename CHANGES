@@ -1,3 +1,11 @@
+2011/01/27 Duane Wessels
+
+    Fixed some portability bugs (OpenBSD, gmake 3.82) and other
+    minor bugs.
+
+    Added a feature (-n option) to restrict counting to a given
+    query name.
+
 2011/01/05 Duane Wessels
 
     Found a fixed a few problems after spending some quality time
