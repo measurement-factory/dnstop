@@ -10,6 +10,8 @@ known_tlds.h
 hashtbl.c
 hashtbl.h
 lookup3.c
+inX_addr.c
+inX_addr.h
 "
 
 chmod a+r $FILES
