@@ -1,5 +1,4 @@
 PROG=dnstop
-DATE != date +%Y%m%d
 
 OPTFLAGS=@OPTFLAGS@
 CC=@CC@
@@ -44,13 +43,14 @@ distclean: clean
 	rm -f Makefile
 
 tar:
-	mkdir $(PROG)-$(DATE)
-	cp -p LICENSE CHANGES $(SRCS) $(PROG).8 $(PROG)-$(DATE)
-	cp -p configure Makefile.in config.h.in install-sh $(PROG)-$(DATE)
-	perl -pi -e "s/\@VERSION\@/$(DATE)/" $(PROG)-$(DATE)/dnstop.c
-	tar czvf $(PROG)-$(DATE).tar.gz $(PROG)-$(DATE)
-	chmod 444 $(PROG)-$(DATE).tar.gz
-	rm -rf $(PROG)-$(DATE)
+	DATE=`date +%Y%m%d` && \
+	mkdir $(PROG)-$$DATE && \
+	cp -p LICENSE CHANGES $(SRCS) $(PROG).8 $(PROG)-$$DATE && \
+	cp -p configure Makefile.in config.h.in install-sh $(PROG)-$$DATE && \
+	perl -pi -e "s/\@VERSION\@/$$DATE/" $(PROG)-$$DATE/dnstop.c && \
+	tar czvf $(PROG)-$$DATE.tar.gz $(PROG)-$$DATE && \
+	chmod 444 $(PROG)-$$DATE.tar.gz && \
+	rm -rf $(PROG)-$$DATE && \
 	md5 *.gz > MD5s.txt
 
 install: $(PROG)
