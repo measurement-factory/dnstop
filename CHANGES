@@ -1,3 +1,7 @@
+2011/05/02 Duane Wessels
+
+    Anand Buddhev pointed out that LDFLAGS= is missing from Makefile.in.
+
 2011/01/27 Duane Wessels
 
     Fixed some portability bugs (OpenBSD, gmake 3.82) and other
