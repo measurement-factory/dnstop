@@ -1,6 +1,7 @@
 2011/05/02 Duane Wessels
 
     Anand Buddhev pointed out that LDFLAGS= is missing from Makefile.in.
+    Also updated known_tlds.h.
 
 2011/01/27 Duane Wessels
 
