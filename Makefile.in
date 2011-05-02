@@ -4,6 +4,7 @@ OPTFLAGS=@OPTFLAGS@
 CC=@CC@
 CFLAGS=@CFLAGS@ ${OPTFLAGS}
 LIBS=@LIBS@
+LDFLAGS=@LDFLAGS@
 
 prefix=@prefix@
 exec_prefix=@exec_prefix@
