@@ -1697,6 +1697,7 @@ usage(void)
     fprintf(stderr, "\t-P\tPrint \"progress\" messages in non-interactive mode\n");
     fprintf(stderr, "\t-r\tRedraw interval, in seconds\n");
     fprintf(stderr, "\t-l N\tEnable domain stats up to N components\n");
+    fprintf(stderr, "\t-X\tDon't tabulate the \"source + query name\" stats\n");
     fprintf(stderr, "\t-f\tfilter-name\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "Available filters:\n");
