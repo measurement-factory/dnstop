@@ -135,7 +135,7 @@ pcap_t *pcap = NULL;
  */
 char *bpf_program_str = "udp port 53";
 WINDOW *w;
-static unsigned short port53;
+static unsigned short check_port = 0;
 void (*SubReport) (void)= NULL;
 int (*handle_datalink) (const u_char * pkt, int len)= NULL;
 int Quit = 0;
@@ -667,7 +667,7 @@ handle_udp(const struct udphdr *udp, int len,
     const inX_addr * src_addr,
     const inX_addr * dst_addr)
 {
-    if (port53 != udp->uh_dport && port53 != udp->uh_sport)
+    if (check_port && check_port != udp->uh_dport && check_port != udp->uh_sport)
 	return 0;
     if (0 == handle_dns((char *)(udp + 1), len - sizeof(*udp), src_addr, dst_addr))
 	return 0;
@@ -1750,7 +1750,6 @@ main(int argc, char *argv[])
     struct itimerval redraw_itv;
     struct bpf_program fp;
 
-    port53 = htons(53);
     SubReport = Sources_report;
     progname = strdup(strrchr(argv[0], '/') ? strchr(argv[0], '/') + 1 : argv[0]);
     srandom(time(NULL));
@@ -1831,6 +1830,8 @@ main(int argc, char *argv[])
 	usage();
     device = strdup(argv[0]);
 
+    if (!strcasestr(bpf_program_str, "port "))
+    	check_port = htons(53);
     if (0 == opt_count_queries && 0 == opt_count_replies)
 	opt_count_queries = 1;
 
