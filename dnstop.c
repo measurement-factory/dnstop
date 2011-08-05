@@ -248,6 +248,7 @@ Filter_t AforAFilter;
 Filter_t RFC1918PtrFilter;
 Filter_t RcodeRefusedFilter;
 Filter_t QnameFilter;
+Filter_t BitsquatFilter;
 Filter_t *Filter = NULL;
 
 unsigned int
@@ -1617,6 +1618,51 @@ QnameFilter(FilterData * fd)
     return 0;
 }
 
+const char* BitsquatNames[] = {
+	"FACEBOOK",
+	"GOOGLE",
+	"YAHOO",
+	"YOUTUBE",
+	"BLOGGER",
+	NULL
+};
+
+int
+BitsquatFilter(FilterData * fd)
+{
+    char sld[10];
+    const char *s = QnameToNld(fd->qname, 2);
+    int i;
+    int j;
+    if (0 == s)
+	return 0;
+    strncpy(sld, s, sizeof(sld));
+    sld[sizeof(sld)-1] = 0;
+    if (!strtok(sld, "."))
+	return 0;
+    for (j=0; BitsquatNames[j]; j++)
+	if (0 == strcasecmp(sld, BitsquatNames[j]))
+	    return 0;
+    for (i=0; sld[i]; i++) {
+	int k;
+	int save = sld[i];
+	for (k=0; k<8; k++) {
+	    if (5==k)		// upper/lower case bit
+		continue;
+	    int m = 1<<k;
+	    if (sld[i] & m)
+		sld[i] &= ~m;
+	    else
+		sld[i] |= m;
+	    for (j=0; BitsquatNames[j]; j++)
+		if (0 == strcasecmp(sld, BitsquatNames[j]))
+		    return 1;
+	    sld[i] = save;
+	}
+    }
+    return 0;
+}
+
 void
 set_filter(const char *fn)
 {
@@ -1630,6 +1676,8 @@ set_filter(const char *fn)
 	Filter = RcodeRefusedFilter;
     else if (0 == strcmp(fn, "qname"))
 	Filter = QnameFilter;
+    else if (0 == strcmp(fn, "bitsquat"))
+	Filter = BitsquatFilter;
     else
 	Filter = NULL;
 }
