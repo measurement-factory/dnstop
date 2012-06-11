@@ -1,3 +1,8 @@
+2012/06/11 Duane Wessels
+
+    Added "qtype-any" filter for displaying ANY queries which are
+    now fashionable in DNS based attacks.
+
 2011/05/02 Duane Wessels
 
     Anand Buddhev pointed out that LDFLAGS= is missing from Makefile.in.
