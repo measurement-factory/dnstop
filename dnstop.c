@@ -249,6 +249,7 @@ Filter_t RFC1918PtrFilter;
 Filter_t RcodeRefusedFilter;
 Filter_t QnameFilter;
 Filter_t BitsquatFilter;
+Filter_t QtypeAnyFilter;
 Filter_t *Filter = NULL;
 
 unsigned int
@@ -1663,6 +1664,12 @@ BitsquatFilter(FilterData * fd)
     return 0;
 }
 
+int
+QtypeAnyFilter(FilterData *fd)
+{
+	return fd->qtype == T_ANY;
+}
+
 void
 set_filter(const char *fn)
 {
@@ -1678,6 +1685,8 @@ set_filter(const char *fn)
 	Filter = QnameFilter;
     else if (0 == strcmp(fn, "bitsquat"))
 	Filter = BitsquatFilter;
+    else if (0 == strcmp(fn, "qtype-any"))
+	Filter = QtypeAnyFilter;
     else
 	Filter = NULL;
 }
@@ -1753,6 +1762,7 @@ usage(void)
     fprintf(stderr, "\tA-for-A\n");
     fprintf(stderr, "\trfc1918-ptr\n");
     fprintf(stderr, "\trefused\n");
+    fprintf(stderr, "\tqtype-any\n");
     exit(1);
 }
 
