@@ -1896,6 +1896,11 @@ main(int argc, char *argv[])
     if (0 == opt_count_ipv4 && 0 == opt_count_ipv6)
 	opt_count_ipv4 = opt_count_ipv6 = 1;
 
+    if (RcodeRefusedFilter == Filter) {
+	opt_count_queries = 0;
+	opt_count_replies = 1;
+    }
+
     if (0 == stat(device, &sb))
 	readfile_state = 1;
     if (readfile_state) {
