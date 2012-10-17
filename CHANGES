@@ -1,3 +1,9 @@
+2012/10/15 Duane Wessels
+
+    The 'refused' filter only works on responses, which are not
+    processed by default.  Now, if the 'refused' filter is specified,
+    dnstop will automatically process responses and ignore queries.
+
 2012/06/11 Duane Wessels
 
     Added "qtype-any" filter for displaying ANY queries which are
