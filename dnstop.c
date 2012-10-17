@@ -1888,7 +1888,7 @@ main(int argc, char *argv[])
 	usage();
     device = strdup(argv[0]);
 
-    if (!strcasestr(bpf_program_str, "port "))
+    if (!strstr(bpf_program_str, "port "))
     	check_port = htons(53);
     if (0 == opt_count_queries && 0 == opt_count_replies)
 	opt_count_queries = 1;
