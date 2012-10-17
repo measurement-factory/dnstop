@@ -29,9 +29,6 @@ all: $(PROG)
 $(PROG): $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) ${LIBS}
 
-dnstop.o: dnstop.c
-	$(CC) $(CFLAGS) -c $<
-
 clean:
 	rm -f $(PROG) $(OBJS) $(PROG).core $(PROG).c~
 
