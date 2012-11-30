@@ -1,3 +1,8 @@
+2012/11/30 Duane Wessels
+
+    Added more entries to the table of known query type names (HINFO,
+    AFSDB, PX, SSHFP, NSEC3, NSEC3PARAM, TLSA, DLV).
+
 2012/10/15 Duane Wessels
 
     The 'refused' filter only works on responses, which are not
