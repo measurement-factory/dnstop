@@ -167,27 +167,6 @@ typedef const char *(col_fmt) (const SortItem *);
 typedef char *(strify) (unsigned int);
 
 #define T_MAX 65536
-#ifndef T_A6
-#define T_A6 38
-#endif
-#ifndef T_SRV
-#define T_SRV 33
-#endif
-#ifndef T_DS
-#define T_DS 43
-#endif
-#ifndef T_RRSIG
-#define T_RRSIG 46
-#endif
-#ifndef T_NSEC
-#define T_NSEC 47
-#endif
-#ifndef T_DNSKEY
-#define T_DNSKEY 48
-#endif
-#ifndef T_SPF
-#define T_SPF 99
-#endif
 #define C_MAX 65536
 #define OP_MAX 16
 #define RC_MAX 16
@@ -347,12 +326,12 @@ allocate_anonymous_address(inX_addr * anon_addr, const inX_addr * orig_addr)
 	ptr->addr = *orig_addr;
 	ptr->data = (void *)(ptr + 1);
 	if (4 == inXaddr_version(orig_addr)) {
-	    read(entropy_fd, buf, 4);
+	    (void) read(entropy_fd, buf, 4);
 	    inXaddr_assign_v4(ptr->data, (struct in_addr *)buf);
 	}
 #if USE_IPV6
 	else {
-	    read(entropy_fd, buf, 16);
+	    (void) read(entropy_fd, buf, 16);
 	    inXaddr_assign_v6(ptr->data, (struct in6_addr *)buf);
 	}
 #endif
@@ -1092,11 +1071,17 @@ qtype_str(unsigned int t)
     case T_PTR:
 	return "PTR?";
 	break;
+    case 13:
+	return "HINFO?";
+	break;
     case T_MX:
 	return "MX?";
 	break;
     case T_TXT:
 	return "TXT?";
+	break;
+    case 18:
+	return "AFSDB?";
 	break;
     case T_SIG:
 	return "SIG?";
@@ -1104,35 +1089,59 @@ qtype_str(unsigned int t)
     case T_KEY:
 	return "KEY?";
 	break;
+    case 26:
+	return "PX?";
+	break;
     case T_AAAA:
 	return "AAAA?";
 	break;
     case T_LOC:
 	return "LOC?";
 	break;
-    case T_SRV:
+    case 33:
 	return "SRV?";
 	break;
-    case T_A6:
+    case 35:
+	return "NAPTR?";
+	break;
+    case 38:
 	return "A6?";
 	break;
-    case T_DS:
+    case 41:
+	return "OPT?";
+	break;
+    case 43:
 	return "DS?";
 	break;
-    case T_RRSIG:
+    case 44:
+	return "SSHFP?";
+	break;
+    case 46:
 	return "RRSIG?";
 	break;
-    case T_NSEC:
+    case 47:
 	return "NSEC?";
 	break;
-    case T_DNSKEY:
+    case 48:
 	return "DNSKEY?";
 	break;
-    case T_SPF:
+    case 50:
+	return "NSEC3?";
+	break;
+    case 51:
+	return "NSEC3PARAM?";
+	break;
+    case 52:
+	return "TLSA?";
+	break;
+    case 99:
 	return "SPF?";
 	break;
     case T_ANY:
 	return "ANY?";
+	break;
+    case 32769:
+	return "DLV?";
 	break;
     default:
 	if (qtypes_buf[t])
