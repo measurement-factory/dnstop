@@ -185,6 +185,8 @@ hashtbl *Sources = NULL;
 hashtbl *Destinations = NULL;
 hashtbl *Domains[10];
 hashtbl *DomSrcs[10];
+hashtbl *KnownTLDs = NULL;
+hashtbl *NewGTLDs = NULL;
 
 #ifdef HAVE_STRUCT_BPF_TIMEVAL
 struct bpf_timeval last_ts;
@@ -530,6 +532,15 @@ QnameToNld(const char *qname, int nld)
     return t;
 }
 
+char *
+str_tolower(char *s)
+{
+    char *t;
+    for (t = s; *t; t++)
+	*t = tolower(*t);
+    return s;
+}
+
 int
 handle_dns(const char *buf, int len,
     const inX_addr * src_addr,
@@ -591,8 +602,7 @@ handle_dns(const char *buf, int len,
 	*t = ' ';
     while ((t = strchr(qname, '\r')))
 	*t = ' ';
-    for (t = qname; *t; t++)
-	*t = tolower(*t);
+    str_tolower(qname);
 
     memcpy(&us, buf + offset, 2);
     qtype = ntohs(us);
@@ -1553,6 +1563,19 @@ report(void)
  */
 
 #include "known_tlds.h"
+#include "new_gtlds.h"
+
+void
+array_to_hash(const char *array[], hashtbl *hash)
+{
+	int i;
+	for (i = 0; array[i]; i++) {
+		char *s = strdup(array[i]);
+		assert(s);
+		str_tolower(s);
+		hash_add(s, s, hash);
+	}
+}
 
 int
 UnknownTldFilter(FilterData * fd)
@@ -1561,10 +1584,21 @@ UnknownTldFilter(FilterData * fd)
     unsigned int i;
     if (NULL == tld)
 	return 1;		/* tld is unknown */
-    for (i = 0; KnownTLDS[i]; i++)
-	if (0 == strcmp(KnownTLDS[i], tld))
-	    return 0;		/* tld is known */
+    if (hash_find(tld, KnownTLDs))
+	return 0;		/* tld is known */
     return 1;			/* tld is unknown */
+}
+
+int
+NewGTldFilter(FilterData * fd)
+{
+    const char *tld = QnameToNld(fd->qname, 1);
+    unsigned int i;
+    if (NULL == tld)
+	return 0;		/* tld is unknown */
+    if (hash_find(tld, NewGTLDs))
+	return 1;		/* tld is new */
+    return 0;			/* tld is old */
 }
 
 int
@@ -1684,6 +1718,8 @@ set_filter(const char *fn)
 {
     if (0 == strcmp(fn, "unknown-tlds"))
 	Filter = UnknownTldFilter;
+    if (0 == strcmp(fn, "new-gtlds"))
+	Filter = NewGTldFilter;
     else if (0 == strcmp(fn, "A-for-A"))
 	Filter = AforAFilter;
     else if (0 == strcmp(fn, "rfc1918-ptr"))
@@ -1823,6 +1859,11 @@ main(int argc, char *argv[])
     memset(qtypes_buf, 0, sizeof(qtypes_buf));
     memset(rcodes_buf, 0, sizeof(rcodes_buf));
     memset(opcodes_buf, 0, sizeof(opcodes_buf));
+
+    KnownTLDs = hash_create(hash_buckets, string_hash, string_cmp);
+    NewGTLDs = hash_create(hash_buckets, string_hash, string_cmp);
+    array_to_hash(KnownTLDs_array, KnownTLDs);
+    array_to_hash(NewGTLDs_array, NewGTLDs);
 
     while ((x = getopt(argc, argv, "46ab:B:f:i:l:n:pPr:QRvVX")) != -1) {
 	switch (x) {

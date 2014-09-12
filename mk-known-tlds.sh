@@ -5,7 +5,7 @@ exec </tmp/tlds
 
 cat <<EOF
 
-static const char *KnownTLDS[] = {
+static const char *KnownTLDs_array[] = {
 	".",	/* special case for root zone */
 EOF
 
