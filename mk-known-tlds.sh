@@ -1,6 +1,6 @@
 #!/bin/sh
 set -e
-fetch -o /tmp/tlds http://data.iana.org/TLD/tlds-alpha-by-domain.txt
+wget -O /tmp/tlds http://data.iana.org/TLD/tlds-alpha-by-domain.txt
 exec </tmp/tlds
 
 cat <<EOF
