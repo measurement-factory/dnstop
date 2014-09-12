@@ -1,3 +1,16 @@
+2014/09/12 Duane Wessels
+
+    Added 'new-gtlds' filter, which includes only queries for names
+    ending with one of the new (2013/2014) generic TLDs.  This may
+    be useful to find hosts/servers using internal names which may
+    collide with new gTLDs once they become active.  If you use
+    short (not fully qualified) names internally you may be uknownlying
+    relying on root (or other) name servers to return NXDOMAIN for
+    them.  If so, "you're gonna have a bad time."
+
+    Along with this new feature, TLD lists are now hashed in the
+    code for faster lookups.
+
 2012/11/30 Duane Wessels
 
     Added more entries to the table of known query type names (HINFO,
