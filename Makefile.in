@@ -17,6 +17,7 @@ SRCS=	$(PROG).c \
 	hashtbl.c hashtbl.h \
 	inX_addr.c inX_addr.h \
 	known_tlds.h \
+	new_gtlds.h \
 	lookup3.c
 
 OBJS=	$(PROG).o \
