@@ -7,6 +7,7 @@ Makefile
 dnstop.8
 dnstop.c
 known_tlds.h
+new_gtlds.h
 hashtbl.c
 hashtbl.h
 lookup3.c
