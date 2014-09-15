@@ -1395,7 +1395,7 @@ Simple_report(int a[], unsigned int max, const char *name, strify * to_str)
     unsigned int sortsize = 0;
     SortItem *sortme = calloc(max, sizeof(SortItem));
     for (i = 0; i < max; i++) {
-	if (0 == a[i])
+	if (0 >= a[i])
 	    continue;
 	sum += a[i];
 	sortme[sortsize].cnt = a[i];
