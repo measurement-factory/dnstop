@@ -1388,7 +1388,7 @@ Qtype_col_fmt(const SortItem * si)
 }
 
 void
-Simple_report(unsigned int a[], unsigned int max, const char *name, strify * to_str)
+Simple_report(int a[], unsigned int max, const char *name, strify * to_str)
 {
     unsigned int i;
     unsigned int sum = 0;
