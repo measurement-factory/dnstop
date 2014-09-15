@@ -1808,6 +1808,7 @@ usage(void)
     fprintf(stderr, "\n");
     fprintf(stderr, "Available filters:\n");
     fprintf(stderr, "\tunknown-tlds\n");
+    fprintf(stderr, "\tnew-gtlds\n");
     fprintf(stderr, "\tA-for-A\n");
     fprintf(stderr, "\trfc1918-ptr\n");
     fprintf(stderr, "\trefused\n");
