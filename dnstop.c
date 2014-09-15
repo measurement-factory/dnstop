@@ -18,6 +18,8 @@ static const char *Version = "@VERSION@";
 
 #include <netinet/in.h>
 
+#include <err.h>
+#include <errno.h>
 #include <pcap.h>
 #include <signal.h>
 #include <stdio.h>
@@ -328,12 +330,16 @@ allocate_anonymous_address(inX_addr * anon_addr, const inX_addr * orig_addr)
 	ptr->addr = *orig_addr;
 	ptr->data = (void *)(ptr + 1);
 	if (4 == inXaddr_version(orig_addr)) {
-	    (void) read(entropy_fd, buf, 4);
+	    ssize_t rd = read(entropy_fd, buf, 4);
+	    if (rd < 4)
+		err(errno, "read entropy");
 	    inXaddr_assign_v4(ptr->data, (struct in_addr *)buf);
 	}
 #if USE_IPV6
 	else {
-	    (void) read(entropy_fd, buf, 16);
+	    ssize_t rd = read(entropy_fd, buf, 16);
+	    if (rd < 16)
+		err(errno, "read entropy");
 	    inXaddr_assign_v6(ptr->data, (struct in6_addr *)buf);
 	}
 #endif
@@ -1581,7 +1587,6 @@ int
 UnknownTldFilter(FilterData * fd)
 {
     const char *tld = QnameToNld(fd->qname, 1);
-    unsigned int i;
     if (NULL == tld)
 	return 1;		/* tld is unknown */
     if (hash_find(tld, KnownTLDs))
@@ -1593,7 +1598,6 @@ int
 NewGTldFilter(FilterData * fd)
 {
     const char *tld = QnameToNld(fd->qname, 1);
-    unsigned int i;
     if (NULL == tld)
 	return 0;		/* tld is unknown */
     if (hash_find(tld, NewGTLDs))
