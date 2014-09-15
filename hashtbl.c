@@ -73,7 +73,9 @@ hash_free(hashtbl *tbl, void freefunc(void *))
 	int slot;
 	for(slot = 0; slot < tbl->modulus; slot++) {
 		hashitem *i;
-		for (i = tbl->items[slot]; i; i=i->next) {
+		hashitem *next;
+		for (i = tbl->items[slot]; i; i=next) {
+			next = i->next;
 			freefunc(i->data);
 			free(i);
 		}
