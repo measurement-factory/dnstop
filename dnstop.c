@@ -1162,7 +1162,7 @@ qtype_str(unsigned int t)
     default:
 	if (qtypes_buf[t])
 	    return qtypes_buf[t];
-	snprintf(buf, sizeof(buf), "#%hu?", t);
+	snprintf(buf, sizeof(buf), "#%u?", t);
 	return qtypes_buf[t] = strdup(buf);
     }
     /* NOTREACHED */
