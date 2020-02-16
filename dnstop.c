@@ -976,6 +976,7 @@ keyboard(void)
     case 'a':
         sort_avgdelta = sort_avgdelta ? 0 : 1;
         sort_maxdelta = 0;
+	break;
     case 'm':
         sort_maxdelta = sort_maxdelta ? 0 : 1;
         sort_avgdelta = 0;
