@@ -155,8 +155,8 @@ int anon_flag = 0;
 int max_level = 2;
 int cur_level = 1;
 int show_delta = 1;
-int sort_maxdelta = 1;
-int sort_avgdelta = 1;
+int sort_maxdelta = 0;
+int sort_avgdelta = 0;
 int promisc_flag = 1;
 int progress_flag = 0;
 ip_list_t *IgnoreList = NULL;
@@ -1515,17 +1515,20 @@ AgentAddr_report(hashtbl * tbl, const char *what)
 	sum += a->count;
 	delta = a->count - a->prevcount;
 	if (delta>a->maxdelta) a->maxdelta = delta;
-    a->prevcount = a->count;
-    if (delta > 0) {
-        a->avgadd += delta;
-        a->avgct++;
-    }
-	sortme[sortsize].cnt = a->count;
-	sortme[sortsize].delta = delta;
-    sortme[sortsize].avgdelta = (double) a->avgadd / (double) a->avgct;
-	sortme[sortsize].maxdelta = a->maxdelta;
-	sortme[sortsize].ptr = a;
-	sortsize++;
+        a->prevcount = a->count;
+        if (delta > 0) {
+            a->avgadd += delta;
+            a->avgct++;
+        }
+        sortme[sortsize].cnt = a->count;
+        sortme[sortsize].delta = delta;
+        if (a->avgct > 0)
+            sortme[sortsize].avgdelta = (double) a->avgadd / (double) a->avgct;
+        else
+            sortme[sortsize].avgdelta = 0;
+        sortme[sortsize].maxdelta = a->maxdelta;
+        sortme[sortsize].ptr = a;
+        sortsize++;
     }
     qsort(sortme, sortsize, sizeof(SortItem), SortItem_cmp);
     Table_report(sortme, sortsize,
