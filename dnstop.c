@@ -79,6 +79,10 @@ static const char *Version = "@VERSION@";
 typedef struct {
     inX_addr src;
     int count;
+    int prevcount;
+    int maxdelta;
+    long avgadd;
+    int avgct;
 }      AgentAddr;
 
 typedef struct {
@@ -99,6 +103,9 @@ typedef struct {
 
 typedef struct {
     int cnt;
+    int delta;
+    double avgdelta;
+    int maxdelta;
     void *ptr;
 }      SortItem;
 
@@ -147,6 +154,9 @@ char *progname = NULL;
 int anon_flag = 0;
 int max_level = 2;
 int cur_level = 1;
+int show_delta = 1;
+int sort_maxdelta = 0;
+int sort_avgdelta = 0;
 int promisc_flag = 1;
 int progress_flag = 0;
 ip_list_t *IgnoreList = NULL;
@@ -440,6 +450,14 @@ SortItem_cmp(const void *A, const void *B)
 {
     const SortItem *a = A;
     const SortItem *b = B;
+    if (sort_maxdelta) {
+        if (a->maxdelta < b->maxdelta) return 1;
+        if (a->maxdelta > b->maxdelta) return -1;
+    }
+    if (sort_avgdelta) {
+        if (a->avgdelta < b->avgdelta) return 1;
+        if (a->avgdelta > b->avgdelta) return -1;
+    }
     if (a->cnt < b->cnt)
 	return 1;
     if (a->cnt > b->cnt)
@@ -952,6 +970,17 @@ keyboard(void)
     case 'd':
 	SubReport = Destinatioreport;
 	break;
+    case 'e':
+        show_delta = show_delta ? 0 : 1;
+        break;
+    case 'a':
+        sort_avgdelta = sort_avgdelta ? 0 : 1;
+        sort_maxdelta = 0;
+	break;
+    case 'm':
+        sort_maxdelta = sort_maxdelta ? 0 : 1;
+        sort_avgdelta = 0;
+        break;
     case '1':
     case '2':
     case '3':
@@ -1040,6 +1069,9 @@ Help_report(void)
 {
     print_func(" s - Sources list\n");
     print_func(" d - Destinations list\n");
+    print_func(" e - Toggle display of delta\n");
+    print_func(" a - Toggle sorting by average delta\n");
+    print_func(" m - Toggle sorting by maximum delta\n");
     print_func(" t - Query types\n");
     print_func(" o - Opcodes\n");
     print_func(" r - Rcodes\n");
@@ -1288,6 +1320,9 @@ Table_report(SortItem * sorted, int rows, const char *col1, const char *col2, co
     int W2 = col2 ? strlen(col2) : 0;
     int WC = 9;			/* width of "Count" column */
     int WP = 6;			/* width of "Percent" column */
+    int WD = 8;			/* width of "Delta" column */
+    int WA = 8;         /* width of "AvgDeleta" column */
+    int WM = 8;			/* width of "MaxDelta" column */
     int i;
     int nlines = get_nlines();
     int ncols = get_ncols();
@@ -1307,19 +1342,44 @@ Table_report(SortItem * sorted, int rows, const char *col1, const char *col2, co
 	W1 = ncols - 1 - WC - 1 - WP - 1 - WP - 1;
 
     if (NULL == col2 || NULL == F2) {
-	snprintf(fmt1, 64, "%%-%d.%ds %%%ds %%%ds %%%ds\n", W1, W1, WC, WP, WP);
-	snprintf(fmt2, 64, "%%-%d.%ds %%%dd %%%d.1f %%%d.1f\n", W1, W1, WC, WP, WP);
-	print_func(fmt1, col1, "Count", "%", "cum%");
-	print_func(fmt1, dashes(W1), dashes(WC), dashes(WP), dashes(WP));
-	for (i = 0; i < nlines; i++) {
-	    sum += (sorted + i)->cnt;
-	    const char *t = F1(sorted + i);
-	    print_func(fmt2,
-		t,
-		(sorted + i)->cnt,
-		100.0 * (sorted + i)->cnt / base,
-		100.0 * sum / base);
-	}
+    if (show_delta)
+    {
+        if (W1 + 1 + WC + 1 + WP + 1 + WP + 1 + WD + 1 + WA + 1 + WM + 1 > ncols)
+        W1 = ncols - 1 - WC - 1 - WP - 1 - WP - 1 - WD - 1 - WA - 1 - WM - 1;
+
+        snprintf(fmt1, 64, "%%-%d.%ds %%%ds %%%ds %%%ds %%%ds %%%ds %%%ds\n", W1, W1, WC, WP, WP, WD, WA, WM);
+    	snprintf(fmt2, 64, "%%-%d.%ds %%%dd %%%d.1f %%%d.1f %%%dd %%%d.1f %%%dd\n", W1, W1, WC, WP, WP, WD, WA, WM);
+    	print_func(fmt1, col1, "Count", "%", "cum%", "Delta", "AvgDelta", "MaxDelta");
+    	print_func(fmt1, dashes(W1), dashes(WC), dashes(WP), dashes(WP), dashes(WD), dashes(WA), dashes(WM));
+    	for (i = 0; i < nlines; i++) {
+    	    sum += (sorted + i)->cnt;
+    	    const char *t = F1(sorted + i);
+    	    print_func(fmt2,
+    		t,
+    		(sorted + i)->cnt,
+    		100.0 * (sorted + i)->cnt / base,
+    		100.0 * sum / base,
+            (sorted + i)->delta,
+            (sorted + i)->avgdelta,
+            (sorted + i)->maxdelta);
+    	}
+    }
+    else
+    {
+    	snprintf(fmt1, 64, "%%-%d.%ds %%%ds %%%ds %%%ds\n", W1, W1, WC, WP, WP);
+    	snprintf(fmt2, 64, "%%-%d.%ds %%%dd %%%d.1f %%%d.1f\n", W1, W1, WC, WP, WP);
+    	print_func(fmt1, col1, "Count", "%", "cum%");
+    	print_func(fmt1, dashes(W1), dashes(WC), dashes(WP), dashes(WP));
+    	for (i = 0; i < nlines; i++) {
+    	    sum += (sorted + i)->cnt;
+    	    const char *t = F1(sorted + i);
+    	    print_func(fmt2,
+    		t,
+    		(sorted + i)->cnt,
+    		100.0 * (sorted + i)->cnt / base,
+    		100.0 * sum / base);
+    	}
+    }
     } else {
 	for (i = 0; i < nlines; i++) {
 	    const char *t = F2(sorted + i);
@@ -1445,6 +1505,7 @@ void
 AgentAddr_report(hashtbl * tbl, const char *what)
 {
     unsigned int sum = 0;
+    unsigned int delta = 0;
     int sortsize = hash_count(tbl);
     SortItem *sortme = calloc(sortsize, sizeof(SortItem));
     AgentAddr *a;
@@ -1452,9 +1513,22 @@ AgentAddr_report(hashtbl * tbl, const char *what)
     sortsize = 0;
     while ((a = hash_iterate(tbl))) {
 	sum += a->count;
-	sortme[sortsize].cnt = a->count;
-	sortme[sortsize].ptr = a;
-	sortsize++;
+	delta = a->count - a->prevcount;
+	if (delta>a->maxdelta) a->maxdelta = delta;
+        a->prevcount = a->count;
+        if (delta > 0) {
+            a->avgadd += delta;
+            a->avgct++;
+        }
+        sortme[sortsize].cnt = a->count;
+        sortme[sortsize].delta = delta;
+        if (a->avgct > 0)
+            sortme[sortsize].avgdelta = (double) a->avgadd / (double) a->avgct;
+        else
+            sortme[sortsize].avgdelta = 0;
+        sortme[sortsize].maxdelta = a->maxdelta;
+        sortme[sortsize].ptr = a;
+        sortsize++;
     }
     qsort(sortme, sortsize, sizeof(SortItem), SortItem_cmp);
     Table_report(sortme, sortsize,
