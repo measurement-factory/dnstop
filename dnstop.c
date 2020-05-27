@@ -1312,8 +1312,9 @@ Table_report(SortItem * sorted, int rows, const char *col1, const char *col2, co
 	print_func(fmt1, col1, "Count", "%", "cum%");
 	print_func(fmt1, dashes(W1), dashes(WC), dashes(WP), dashes(WP));
 	for (i = 0; i < nlines; i++) {
+	    const char *t;
 	    sum += (sorted + i)->cnt;
-	    const char *t = F1(sorted + i);
+	    t = F1(sorted + i);
 	    print_func(fmt2,
 		t,
 		(sorted + i)->cnt,
@@ -1695,9 +1696,10 @@ BitsquatFilter(FilterData * fd)
 	int k;
 	int save = sld[i];
 	for (k=0; k<8; k++) {
+	    int m;
 	    if (5==k)		// upper/lower case bit
 		continue;
-	    int m = 1<<k;
+	    m = 1<<k;
 	    if (sld[i] & m)
 		sld[i] &= ~m;
 	    else
@@ -1836,13 +1838,15 @@ void
 progress(pcap_t * p)
 {
     unsigned int msgs = query_count_total + reply_count_total;
+    time_t wall_elapsed;
+    double rate;
     gettimeofday(&now, NULL);
     if (now.tv_sec == last_progress.tv_sec)
 	return;
-    time_t wall_elapsed = now.tv_sec - start.tv_sec;
+    wall_elapsed = now.tv_sec - start.tv_sec;
     if (0 == wall_elapsed)
 	return;
-    double rate = (double)msgs / wall_elapsed;
+    rate = (double)msgs / wall_elapsed;
     fprintf(stderr, "%u %7.1f m/s\n", msgs, rate);
     last_progress = now;
 }
