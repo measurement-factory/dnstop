@@ -21,7 +21,8 @@ To help find especially undesirable DNS queries, _dnstop_ provides a number of f
 - For unknown/invalid TLDs
 - A queries where the query name is already an IP address
 - PTR queries for RFC1918 address space
-- Responses with code REFUSED 
+- Responses with code REFUSED
+- Responses with code SERVFAIL
 
 _dnstop_ can either read packets from the live capture device, or from a tcpdump savefile.
 

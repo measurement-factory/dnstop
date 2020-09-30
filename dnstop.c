@@ -230,6 +230,7 @@ Filter_t UnknownTldFilter;
 Filter_t AforAFilter;
 Filter_t RFC1918PtrFilter;
 Filter_t RcodeRefusedFilter;
+Filter_t RcodeServfailFilter;
 Filter_t QnameFilter;
 Filter_t BitsquatFilter;
 Filter_t QtypeAnyFilter;
@@ -1649,6 +1650,12 @@ RcodeRefusedFilter(FilterData * fd)
 }
 
 int
+RcodeServfailFilter(FilterData * fd)
+{
+    return SERVFAIL == fd->rcode ? 1 : 0;
+}
+
+int
 QnameFilter(FilterData * fd)
 {
     const char *F = opt_filter_by_name;
@@ -1732,6 +1739,8 @@ set_filter(const char *fn)
 	Filter = RFC1918PtrFilter;
     else if (0 == strcmp(fn, "refused"))
 	Filter = RcodeRefusedFilter;
+    else if (0 == strcmp(fn, "servfail"))
+	Filter = RcodeServfailFilter;
     else if (0 == strcmp(fn, "qname"))
 	Filter = QnameFilter;
     else if (0 == strcmp(fn, "bitsquat"))
@@ -1814,6 +1823,7 @@ usage(void)
     fprintf(stderr, "\tA-for-A\n");
     fprintf(stderr, "\trfc1918-ptr\n");
     fprintf(stderr, "\trefused\n");
+    fprintf(stderr, "\tservfail\n");
     fprintf(stderr, "\tqtype-any\n");
     exit(1);
 }
@@ -1955,7 +1965,7 @@ main(int argc, char *argv[])
     if (0 == opt_count_ipv4 && 0 == opt_count_ipv6)
 	opt_count_ipv4 = opt_count_ipv6 = 1;
 
-    if (RcodeRefusedFilter == Filter) {
+    if (RcodeRefusedFilter == Filter || RcodeServfailFilter == Filter) {
 	opt_count_queries = 0;
 	opt_count_replies = 1;
     }
