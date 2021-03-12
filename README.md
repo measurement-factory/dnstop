@@ -23,6 +23,7 @@ To help find especially undesirable DNS queries, _dnstop_ provides a number of f
 - PTR queries for RFC1918 address space
 - Responses with code REFUSED
 - Responses with code SERVFAIL
+- Responses with code NXDOMAIN
 
 _dnstop_ can either read packets from the live capture device, or from a tcpdump savefile.
 

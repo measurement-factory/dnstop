@@ -1,8 +1,8 @@
 /*
  * $Id$
- * 
+ *
  * http://dnstop.measurement-factory.com/
- * 
+ *
  * Copyright (c) 2002, The Measurement Factory, Inc.  All rights reserved.  See
  * the LICENSE file for details.
  */
@@ -129,9 +129,9 @@ char *device = NULL;
 pcap_t *pcap = NULL;
 /*
  * bpf_program_str used to default to:
- * 
+ *
  * udp dst port 53 and udp[10:2] & 0x8000 = 0
- * 
+ *
  * but that didn't work so well with IPv6.  Now we have the command line options
  * -Q and -R to choose counting queries, responses, or both.
  */
@@ -231,6 +231,7 @@ Filter_t AforAFilter;
 Filter_t RFC1918PtrFilter;
 Filter_t RcodeRefusedFilter;
 Filter_t RcodeServfailFilter;
+Filter_t RcodeNxdomainFilter;
 Filter_t QnameFilter;
 Filter_t BitsquatFilter;
 Filter_t QtypeAnyFilter;
@@ -1656,6 +1657,12 @@ RcodeServfailFilter(FilterData * fd)
 }
 
 int
+RcodeNxdomainFilter(FilterData * fd)
+{
+    return NXDOMAIN == fd->rcode ? 1 : 0;
+}
+
+int
 QnameFilter(FilterData * fd)
 {
     const char *F = opt_filter_by_name;
@@ -1741,6 +1748,8 @@ set_filter(const char *fn)
 	Filter = RcodeRefusedFilter;
     else if (0 == strcmp(fn, "servfail"))
 	Filter = RcodeServfailFilter;
+    else if (0 == strcmp(fn, "nxdomain"))
+	Filter = RcodeNxdomainFilter;
     else if (0 == strcmp(fn, "qname"))
 	Filter = QnameFilter;
     else if (0 == strcmp(fn, "bitsquat"))
@@ -1824,6 +1833,7 @@ usage(void)
     fprintf(stderr, "\trfc1918-ptr\n");
     fprintf(stderr, "\trefused\n");
     fprintf(stderr, "\tservfail\n");
+    fprintf(stderr, "\tnxdomain\n");
     fprintf(stderr, "\tqtype-any\n");
     exit(1);
 }
@@ -1965,7 +1975,9 @@ main(int argc, char *argv[])
     if (0 == opt_count_ipv4 && 0 == opt_count_ipv6)
 	opt_count_ipv4 = opt_count_ipv6 = 1;
 
-    if (RcodeRefusedFilter == Filter || RcodeServfailFilter == Filter) {
+    if (RcodeRefusedFilter == Filter ||
+	  RcodeServfailFilter == Filter ||
+	  RcodeNxdomainFilter == Filter) {
 	opt_count_queries = 0;
 	opt_count_replies = 1;
     }
