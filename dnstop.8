@@ -1,5 +1,5 @@
 .\" $Id$
-.\" 
+.\"
 .\" manpage written by jose@monkey.org
 .\"
 .Dd 21 March, 2008
@@ -24,7 +24,7 @@ is a small tool to listen on
 or to parse the file
 .Ar savefile
 and collect and print statistics on the local network's DNS traffic. You
-must have read access to 
+must have read access to
 .Pa /dev/bpf\&* .
 .Sh COMMAND LINE OPTIONS
 .Pp
@@ -65,7 +65,7 @@ provides more details, but also requires more memory and CPU.
 .It Fl f
 input filter name
 .Pp
-The "unknown-tlds" filter 
+The "unknown-tlds" filter
 includes only queries for TLDs that are
 bogus.  Useful for identifying hosts/servers
 that leak queries for things like "localhost"
@@ -116,7 +116,7 @@ hash table buckets.
 Do not tabulate the sources + query name counters.  This can significantly
 reduce memory usage on busy servers and large savefiles.
 .It Ar savefile
-a captured network trace in 
+a captured network trace in
 .Cm pcap
 format
 .It Ar device
@@ -128,7 +128,7 @@ While running, the following options are available to alter the display:
 .Bl -tag -width Ds
 .It s
 display the source address table
-.It d 
+.It d
 display the destination address table
 .It t
 display the breakdown of query types seen
@@ -181,7 +181,7 @@ redraw
 .It ?
 help
 .El
-.Pp 
+.Pp
 .Sh NON-INTERACTIVE MODE
 If stdout is not a tty,
 .Nm
@@ -215,7 +215,7 @@ you might want to examine both queries and replies by giving both
 .Fl R
 and
 .Fl Q
-command line options.  In this case, only the response code counts 
+command line options.  In this case, only the response code counts
 are taken from the replies and all other attributes
 are taken from the queries.
 .Pp
