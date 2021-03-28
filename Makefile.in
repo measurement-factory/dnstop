@@ -55,6 +55,7 @@ tar:
 
 install: $(PROG)
 	install -m 755 $(PROG) ${DESTDIR}${bindir}
+	mkdir -p ${DESTDIR}${mandir}/man8
 	install -m 644 $(PROG).8 ${DESTDIR}${mandir}/man8
 
 uninstall:
