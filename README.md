@@ -29,3 +29,4 @@ _dnstop_ can either read packets from the live capture device, or from a tcpdump
 
 See also http://dns.measurement-factory.com/tools/dnstop/.
 
+For compatibility with [musl libc](https://musl.libc.org/), define `CFLAGS=-D_GNU_SOURCE` during `configure`.
