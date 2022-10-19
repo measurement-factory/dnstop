@@ -1817,6 +1817,7 @@ usage(void)
     fprintf(stderr, "\t-R\tCount responses\n");
     fprintf(stderr, "\t-a\tAnonymize IP Addrs\n");
     fprintf(stderr, "\t-b expr\tBPF program code\n");
+    fprintf(stderr, "\t-B num\tUse num hash table buckets (default %u)\n", hash_buckets);
     fprintf(stderr, "\t-i addr\tIgnore this source IP address\n");
     fprintf(stderr, "\t-n name\tCount only messages in this domain\n");
     fprintf(stderr, "\t-p\tDon't put interface in promiscuous mode\n");
@@ -1904,12 +1905,6 @@ main(int argc, char *argv[])
 	    break;
 	case 'a':
 	    anon_flag = 1;
-	    break;
-	case 's':
-	    max_level = 2;
-	    break;
-	case 't':
-	    max_level = 3;
 	    break;
 	case 'l':
 	    max_level = atoi(optarg);
