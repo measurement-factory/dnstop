@@ -157,6 +157,10 @@ int opt_count_ipv4 = 0;
 int opt_count_ipv6 = 0;
 int opt_count_domsrc = 1;
 const char *opt_filter_by_name = 0;
+unsigned int opt_v4_agg = 0;
+unsigned int opt_v6_agg = 0;
+static inX_addr v4mask;
+static inX_addr v6mask;
 
 /*
  * flags/features for non-interactive mode
@@ -697,6 +701,11 @@ handle_ipv6(struct ip6_hdr *ipv6, int len)
     if (ignore_list_match(&src_addr))
 	return (0);
 
+    if (opt_v6_agg) {
+	src_addr = inXaddr_mask(&src_addr, &v6mask);
+	dst_addr = inXaddr_mask(&dst_addr, &v6mask);
+    }
+
     /*
      * Parse extension headers. This only handles the standard headers, as
      * defined in RFC 2460, correctly. Fragments are discarded.
@@ -769,6 +778,11 @@ handle_ipv4(const struct ip *ip, int len)
     inXaddr_assign_v4(&dst_addr, &ip->ip_dst);
     if (ignore_list_match(&src_addr))
 	return (0);
+
+    if (opt_v4_agg) {
+	src_addr = inXaddr_mask(&src_addr, &v4mask);
+	dst_addr = inXaddr_mask(&dst_addr, &v4mask);
+    }
 
     if (IPPROTO_UDP != ip->ip_p)
 	return 0;
@@ -1818,6 +1832,8 @@ usage(void)
     fprintf(stderr, "\t-a\tAnonymize IP Addrs\n");
     fprintf(stderr, "\t-b expr\tBPF program code\n");
     fprintf(stderr, "\t-B num\tUse num hash table buckets (default %u)\n", hash_buckets);
+    fprintf(stderr, "\t-C len\tAggregate IPv4 addresses by prefix length\n");
+    fprintf(stderr, "\t-D len\tAggregate IPv6 addresses by prefix length\n");
     fprintf(stderr, "\t-i addr\tIgnore this source IP address\n");
     fprintf(stderr, "\t-n name\tCount only messages in this domain\n");
     fprintf(stderr, "\t-p\tDon't put interface in promiscuous mode\n");
@@ -1895,7 +1911,7 @@ main(int argc, char *argv[])
     array_to_hash(KnownTLDs_array, KnownTLDs);
     array_to_hash(NewGTLDs_array, NewGTLDs);
 
-    while ((x = getopt(argc, argv, "46ab:B:f:i:l:n:pPr:QRvVX")) != -1) {
+    while ((x = getopt(argc, argv, "46ab:B:C:D:f:i:l:n:pPr:QRvVX")) != -1) {
 	switch (x) {
 	case '4':
 	    opt_count_ipv4 = 1;
@@ -1905,6 +1921,16 @@ main(int argc, char *argv[])
 	    break;
 	case 'a':
 	    anon_flag = 1;
+	    break;
+	case 'C':
+	    opt_v4_agg = atoi(optarg);
+	    if (opt_v4_agg < 1 || opt_v4_agg > 32)
+		usage();
+	    break;
+	case 'D':
+	    opt_v6_agg = atoi(optarg);
+	    if (opt_v6_agg < 1 || opt_v6_agg > 128)
+		usage();
 	    break;
 	case 'l':
 	    max_level = atoi(optarg);
@@ -1975,6 +2001,26 @@ main(int argc, char *argv[])
 	  RcodeNxdomainFilter == Filter) {
 	opt_count_queries = 0;
 	opt_count_replies = 1;
+    }
+
+    if (opt_v4_agg) {
+	/* Create mask variable from v4 prefix length */
+	struct in_addr x;
+	x.s_addr = htonl(~0 << (32-opt_v4_agg));
+	inXaddr_assign_v4(&v4mask, &x);
+    }
+
+    if (opt_v6_agg) {
+	/* Create mask variable from v6 prefix length */
+	struct in6_addr x;
+	for (unsigned int i = 0 ; i < 128; i++) {
+	    x.s6_addr32[i/32] <<= 1;
+	    x.s6_addr32[i/32] += i < opt_v6_agg ? 1 : 0;
+	}
+	for (unsigned int i = 0 ; i < 4; i++) {
+	    x.s6_addr32[i] = htonl(x.s6_addr32[i]);
+	}
+	inXaddr_assign_v6(&v6mask, &x);
     }
 
     if (0 == stat(device, &sb))
