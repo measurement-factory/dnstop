@@ -1166,6 +1166,12 @@ qtype_str(unsigned int t)
     case 52:
 	return "TLSA?";
 	break;
+    case 64:
+    return "SVCB?";
+    break;
+    case 65:
+    return "HTTPS?";
+    break;
     case 99:
 	return "SPF?";
 	break;
