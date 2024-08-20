@@ -1,0 +1,8 @@
+*~
+autom4te.cache
+Makefile
+config.h
+config.log
+config.status
+dnstop
+*.o
