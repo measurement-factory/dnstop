@@ -566,9 +566,10 @@ str_tolower(char *s)
  * parse an OPT RR, return new offset
  */
 off_t
-parse_opt(const char *buf, int len, off_t offset)
+parse_opt(const char *buf, int len, off_t offset, unsigned int *version_ret, unsigned int *flags_ret)
 {
     char opt_owner[MAX_QNAME_SZ];
+    unsigned short uc;
     unsigned short us;
     unsigned short qtype;
     unsigned short udp_size;
@@ -578,6 +579,7 @@ parse_opt(const char *buf, int len, off_t offset)
     unsigned short rdlen;
     int x;
 
+    opt_owner[0] = 0;
     x = rfc1035NameUnpack(buf, len, &offset, opt_owner, MAX_QNAME_SZ);
     if (0 != x)
 	return offset;
@@ -586,7 +588,8 @@ parse_opt(const char *buf, int len, off_t offset)
     memcpy(&us, buf + offset + 2, 2);
     udp_size = ntohs(us);
     memcpy(&ext_rcode, buf + offset + 4, 1);
-    memcpy(&edns_version, buf + offset + 5, 1);
+    memcpy(&uc, buf + offset + 5, 1);
+    edns_version = uc;
     memcpy(&us, buf + offset + 6, 2);
     edns_flags = ntohs(us);
     memcpy(&us, buf + offset + 8, 2);
@@ -598,8 +601,8 @@ parse_opt(const char *buf, int len, off_t offset)
         return offset;
     if (0 != strlen(opt_owner))
         return offset;
-    ednsver_counts[edns_version]++;
-    ednsflag_counts[edns_flags]++;
+    *version_ret = edns_version;
+    *flags_ret = edns_flags;
     return offset;
 }
 
@@ -715,12 +718,12 @@ handle_dns(const char *buf, int len,
     }
 
     if (0 == qh.qr && opt_parse_edns) {
-	if (qh.arcount > 0 && offset < len) {
-            offset = parse_opt(buf, len, offset);
-	} else {
-            ednsver_counts[EV_MAX-1]++;
-            ednsflag_counts[EF_MAX-1]++;
-	}
+	unsigned int edns_ver = EV_MAX-1;
+	unsigned int edns_flags = EF_MAX-1;
+	if (qh.arcount > 0 && offset < len)
+            offset = parse_opt(buf, len, offset, &edns_ver, &edns_flags);
+        ednsver_counts[edns_ver]++;
+        ednsflag_counts[edns_flags]++;
     }
     return 1;
 }
@@ -1339,7 +1342,7 @@ ednsver_str(unsigned int v)
 {
     static char buf[30];
     if (EV_MAX-1 == v)
-	return "N/A";
+	return "<No_EDNS>";
     if (ednsver_buf[v])
 	return ednsver_buf[v];
     snprintf(buf, sizeof(buf), "%u", v);
@@ -1352,7 +1355,7 @@ ednsflag_str(unsigned int v)
     static char buf[64];
     unsigned int l = 0;
     if (EF_MAX-1 == v)
-	return "N/A";
+	return "<No_EDNS>";
     if (0 == v)
 	return "None";
     if (ednsflag_buf[v])
