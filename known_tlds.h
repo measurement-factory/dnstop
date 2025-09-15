@@ -948,7 +948,6 @@ static const char *KnownTLDs_array[] = {
 	"realty",
 	"recipes",
 	"red",
-	"redstone",
 	"redumbrella",
 	"rehab",
 	"reise",
