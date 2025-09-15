@@ -156,6 +156,7 @@ int opt_count_replies = 0;
 int opt_count_ipv4 = 0;
 int opt_count_ipv6 = 0;
 int opt_count_domsrc = 1;
+int opt_parse_edns = 0;
 const char *opt_filter_by_name = 0;
 unsigned int opt_v4_agg = 0;
 unsigned int opt_v6_agg = 0;
@@ -176,6 +177,8 @@ typedef char *(strify) (unsigned int);
 #define C_MAX 65536
 #define OP_MAX 16
 #define RC_MAX 16
+#define EV_MAX 257
+#define EF_MAX 65537
 
 unsigned int query_count_intvl = 0;
 unsigned int query_count_total = 0;
@@ -186,6 +189,8 @@ int qtype_counts[T_MAX];
 int opcode_counts[OP_MAX];
 int rcode_counts[RC_MAX];
 int qclass_counts[C_MAX];
+int ednsver_counts[EV_MAX];
+int ednsflag_counts[EF_MAX];
 
 hashtbl *Sources = NULL;
 hashtbl *Destinations = NULL;
@@ -207,6 +212,8 @@ time_t report_interval = 1;
 static char *qtypes_buf[T_MAX];
 static char *rcodes_buf[RC_MAX];
 static char *opcodes_buf[OP_MAX];
+static char *ednsver_buf[EV_MAX];
+static char *ednsflag_buf[EF_MAX];
 
 /* Prototypes */
 void Sources_report(void);
@@ -216,6 +223,8 @@ void Opcodes_report(void);
 void Rcodes_report(void);
 void Domain_report();
 void DomSrc_report();
+void Ednsver_report();
+void Ednsflag_report();
 void Help_report(void);
 void ResetCounters(void);
 void report(void);
@@ -553,6 +562,47 @@ str_tolower(char *s)
     return s;
 }
 
+/*
+ * parse an OPT RR, return new offset
+ */
+off_t
+parse_opt(const char *buf, int len, off_t offset)
+{
+    char opt_owner[MAX_QNAME_SZ];
+    unsigned short us;
+    unsigned short qtype;
+    unsigned short udp_size;
+    unsigned char ext_rcode;
+    unsigned char edns_version;
+    unsigned short edns_flags;
+    unsigned short rdlen;
+    int x;
+
+    x = rfc1035NameUnpack(buf, len, &offset, opt_owner, MAX_QNAME_SZ);
+    if (0 != x)
+	return offset;
+    memcpy(&us, buf + offset, 2);
+    qtype = ntohs(us);
+    memcpy(&us, buf + offset + 2, 2);
+    udp_size = ntohs(us);
+    memcpy(&ext_rcode, buf + offset + 4, 1);
+    memcpy(&edns_version, buf + offset + 5, 1);
+    memcpy(&us, buf + offset + 6, 2);
+    edns_flags = ntohs(us);
+    memcpy(&us, buf + offset + 8, 2);
+    rdlen = ntohs(us);
+    offset = offset + 10 + rdlen;
+    assert (offset <= len);
+
+    if (ns_t_opt != qtype)
+        return offset;
+    if (0 != strlen(opt_owner))
+        return offset;
+    ednsver_counts[edns_version]++;
+    ednsflag_counts[edns_flags]++;
+    return offset;
+}
+
 int
 handle_dns(const char *buf, int len,
     const inX_addr * src_addr,
@@ -620,6 +670,7 @@ handle_dns(const char *buf, int len,
     qtype = ntohs(us);
     memcpy(&us, buf + offset + 2, 2);
     qclass = ntohs(us);
+    offset += 4;
 
     if (Filter) {
 	FilterData fd;
@@ -661,6 +712,15 @@ handle_dns(const char *buf, int len,
     } else {
 	reply_count_intvl++;
 	reply_count_total++;
+    }
+
+    if (0 == qh.qr && opt_parse_edns) {
+	if (qh.arcount > 0 && offset < len) {
+            offset = parse_opt(buf, len, offset);
+	} else {
+            ednsver_counts[EV_MAX-1]++;
+            ednsflag_counts[EF_MAX-1]++;
+	}
     }
     return 1;
 }
@@ -1026,6 +1086,12 @@ keyboard(void)
     case 'r':
 	SubReport = Rcodes_report;
 	break;
+    case 'e':
+	SubReport = Ednsver_report;
+	break;
+    case 'f':
+	SubReport = Ednsflag_report;
+	break;
     case 030:
 	Quit = 1;
 	break;
@@ -1077,6 +1143,8 @@ Help_report(void)
 	"\t* - with Sources\n");
     print_func(" 9 - 9th level Query Names"
 	"\t( - with Sources\n");
+    print_func(" e - EDNS Versions\n");
+    print_func(" f - EDNS(0) Flags\n");
     print_func("^R - Reset counters\n");
     print_func("^X - Exit\n");
     print_func("\n");
@@ -1264,6 +1332,48 @@ rcode_str(unsigned int r)
 	return rcodes_buf[r] = strdup(buf);
     }
     /* NOTREACHED */
+}
+
+char *
+ednsver_str(unsigned int v)
+{
+    static char buf[30];
+    if (EV_MAX-1 == v)
+	return "N/A";
+    if (ednsver_buf[v])
+	return ednsver_buf[v];
+    snprintf(buf, sizeof(buf), "%u", v);
+    return ednsver_buf[v] = strdup(buf);
+}
+
+char *
+ednsflag_str(unsigned int v)
+{
+    static char buf[64];
+    unsigned int l = 0;
+    if (EF_MAX-1 == v)
+	return "N/A";
+    if (0 == v)
+	return "None";
+    if (ednsflag_buf[v])
+	return ednsflag_buf[v];
+    for (int i = 15; i >= 0; i--) {
+	if ((v & (1<<i)) == 0)
+	    continue;
+        switch(i) {
+        case(15):
+	    l += snprintf(&buf[l], sizeof(buf)-l, "%s,", "DO");
+	    break;
+        case(14):
+	    l += snprintf(&buf[l], sizeof(buf)-l, "%s,", "CO");
+	    break;
+        default:
+	    l += snprintf(&buf[l], sizeof(buf)-l, "%02d,", i);
+	    break;
+	}
+    }
+    buf[l-1] = '\0';
+    return ednsflag_buf[v] = strdup(buf);
 }
 
 int
@@ -1455,6 +1565,26 @@ void
 Rcodes_report(void)
 {
     Simple_report(rcode_counts, RC_MAX, "Rcode", rcode_str);
+}
+
+void
+Ednsver_report(void)
+{
+    if (opt_parse_edns == 0) {
+	print_func("\tYou must start %s with -E to parse EDNS data.\n", progname);
+	return;
+    }
+    Simple_report(ednsver_counts, EV_MAX, "EDNS Version", ednsver_str);
+}
+
+void
+Ednsflag_report(void)
+{
+    if (opt_parse_edns == 0) {
+	print_func("\tYou must start %s with -E to parse EDNS data.\n", progname);
+	return;
+    }
+    Simple_report(ednsflag_counts, EF_MAX, "EDNS Flags", ednsflag_str);
 }
 
 const char *
@@ -1816,6 +1946,8 @@ ResetCounters(void)
     memset(qclass_counts, 0, sizeof(qclass_counts));
     memset(opcode_counts, 0, sizeof(opcode_counts));
     memset(rcode_counts, 0, sizeof(rcode_counts));
+    memset(ednsver_counts, 0, sizeof(ednsver_counts));
+    memset(ednsflag_counts, 0, sizeof(ednsflag_counts));
     hash_free(Sources, free);
     hash_free(Destinations, free);
     for (lvl = 1; lvl <= max_level; lvl++) {
@@ -1917,7 +2049,7 @@ main(int argc, char *argv[])
     array_to_hash(KnownTLDs_array, KnownTLDs);
     array_to_hash(NewGTLDs_array, NewGTLDs);
 
-    while ((x = getopt(argc, argv, "46ab:B:C:D:f:i:l:n:pPr:QRvVX")) != -1) {
+    while ((x = getopt(argc, argv, "46ab:B:C:D:Ef:i:l:n:pPr:QRvVX")) != -1) {
 	switch (x) {
 	case '4':
 	    opt_count_ipv4 = 1;
@@ -1937,6 +2069,9 @@ main(int argc, char *argv[])
 	    opt_v6_agg = atoi(optarg);
 	    if (opt_v6_agg < 1 || opt_v6_agg > 128)
 		usage();
+	    break;
+	case 'E':
+	    opt_parse_edns = 1;
 	    break;
 	case 'l':
 	    max_level = atoi(optarg);
