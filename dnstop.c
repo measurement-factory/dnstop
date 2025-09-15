@@ -1313,8 +1313,8 @@ Table_report(SortItem * sorted, int rows, const char *col1, const char *col2, co
     int i;
     int nlines = get_nlines();
     int ncols = get_ncols();
-    char fmt1[64];
-    char fmt2[64];
+    char fmt1[128];
+    char fmt2[128];
     unsigned int sum = 0;
 
     if (nlines > rows)
@@ -1351,8 +1351,8 @@ Table_report(SortItem * sorted, int rows, const char *col1, const char *col2, co
 	}
 	if (W2 + 1 + W1 + 1 + WC + 1 + WP + 1 + WP + 1 > ncols)
 	    W2 = ncols - 1 - W1 - 1 - WC - 1 - WP - 1 - WP - 1;
-	snprintf(fmt1, 64, "%%-%d.%ds %%-%d.%ds %%%ds %%%ds %%%ds\n", W1, W1, W2, W2, WC, WP, WP);
-	snprintf(fmt2, 64, "%%-%d.%ds %%-%d.%ds %%%dd %%%d.1f %%%d.1f\n", W1, W1, W2, W2, WC, WP, WP);
+	snprintf(fmt1, sizeof(fmt1), "%%-%d.%ds %%-%d.%ds %%%ds %%%ds %%%ds\n", W1, W1, W2, W2, WC, WP, WP);
+	snprintf(fmt2, sizeof(fmt2), "%%-%d.%ds %%-%d.%ds %%%dd %%%d.1f %%%d.1f\n", W1, W1, W2, W2, WC, WP, WP);
 	print_func(fmt1, col1, col2, "Count", "%", "cum%");
 	print_func(fmt1, dashes(W1), dashes(W2), dashes(WC), dashes(WP), dashes(WP));
 	for (i = 0; i < nlines; i++) {
