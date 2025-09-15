@@ -2020,11 +2020,8 @@ main(int argc, char *argv[])
 	/* Create mask variable from v6 prefix length */
 	struct in6_addr x;
 	for (unsigned int i = 0 ; i < 128; i++) {
-	    x.s6_addr32[i/32] <<= 1;
-	    x.s6_addr32[i/32] += i < opt_v6_agg ? 1 : 0;
-	}
-	for (unsigned int i = 0 ; i < 4; i++) {
-	    x.s6_addr32[i] = htonl(x.s6_addr32[i]);
+	    x.s6_addr[i/8] <<= 1;
+	    x.s6_addr[i/8] += i < opt_v6_agg ? 1 : 0;
 	}
 	inXaddr_assign_v6(&v6mask, &x);
     }
