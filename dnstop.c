@@ -239,6 +239,7 @@ Filter_t RcodeNxdomainFilter;
 Filter_t QnameFilter;
 Filter_t BitsquatFilter;
 Filter_t QtypeAnyFilter;
+Filter_t QtypeWksFilter;
 Filter_t *Filter = NULL;
 
 unsigned int
@@ -1100,6 +1101,9 @@ qtype_str(unsigned int t)
     case T_SOA:
 	return "SOA?";
 	break;
+    case 11:
+	return "WKS?";
+	break;
     case T_PTR:
 	return "PTR?";
 	break;
@@ -1753,6 +1757,12 @@ QtypeAnyFilter(FilterData *fd)
 	return fd->qtype == T_ANY;
 }
 
+int
+QtypeWksFilter(FilterData *fd)
+{
+	return fd->qtype == 11;
+}
+
 void
 set_filter(const char *fn)
 {
@@ -1776,6 +1786,8 @@ set_filter(const char *fn)
 	Filter = BitsquatFilter;
     else if (0 == strcmp(fn, "qtype-any"))
 	Filter = QtypeAnyFilter;
+    else if (0 == strcmp(fn, "qtype-wks"))
+	Filter = QtypeWksFilter;
     else
 	Filter = NULL;
 }
@@ -1858,6 +1870,7 @@ usage(void)
     fprintf(stderr, "\tservfail\n");
     fprintf(stderr, "\tnxdomain\n");
     fprintf(stderr, "\tqtype-any\n");
+    fprintf(stderr, "\tqtype-wks\n");
     exit(1);
 }
 
