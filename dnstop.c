@@ -2030,6 +2030,7 @@ main(int argc, char *argv[])
     }
 
     if (opt_v6_agg) {
+#if USE_IPV6
 	/* Create mask variable from v6 prefix length */
 	struct in6_addr x;
 	for (unsigned int i = 0 ; i < 128; i++) {
@@ -2037,6 +2038,7 @@ main(int argc, char *argv[])
 	    x.s6_addr[i/8] += i < opt_v6_agg ? 1 : 0;
 	}
 	inXaddr_assign_v6(&v6mask, &x);
+#endif
     }
 
     if (0 == stat(device, &sb))
