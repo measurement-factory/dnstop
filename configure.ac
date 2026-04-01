@@ -67,7 +67,7 @@ AC_CHECK_FUNCS([memset select strchr strdup strrchr strstr])
 OPTFLAGS=''
 
 AC_ARG_ENABLE([ipv6],
-	[AS_HELP_STRING([--disable-ipv6], [Enable IPv6 support @<:@default=yes@:>@])],
+	[AS_HELP_STRING([--enable-ipv6], [Enable IPv6 support @<:@default=yes@:>@])],
 	[ enable_ipv6="$enableval" ],
 	[ enable_ipv6=yes ])
 AS_IF([test "$enable_ipv6" != "no"],

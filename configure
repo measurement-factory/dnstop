@@ -1344,7 +1344,7 @@ Optional Features:
   --disable-option-checking  ignore unrecognized --enable/--with options
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
-  --disable-ipv6          Enable IPv6 support [default=yes]
+  --enable-ipv6           Enable IPv6 support [default=yes]
 
 Some influential environment variables:
   CC          C compiler command
@@ -4589,13 +4589,14 @@ OPTFLAGS=''
 # Check whether --enable-ipv6 was given.
 if test ${enable_ipv6+y}
 then :
-  enableval=$enable_ipv6;  if test "$enableval" = "no" ; then enable_ipv6=no ; else enable_ipv6=yes ; fi
+  enableval=$enable_ipv6;  enable_ipv6="$enableval"
 else $as_nop
    enable_ipv6=yes
 fi
 
-if test "$enable_ipv6" = "yes" ; then
-	OPTFLAGS="$OPTFLAGS -DUSE_IPV6=1"
+if test "$enable_ipv6" != "no"
+then :
+  OPTFLAGS="$OPTFLAGS -DUSE_IPV6=1"
 
 fi
 
