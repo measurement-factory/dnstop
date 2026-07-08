@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.71])
-AC_INIT([FULL-PACKAGE-NAME],[VERSION],[BUG-REPORT-ADDRESS])
+AC_INIT([dnstop],[20260707],[https://github.com/measurement-factory/dnstop/issues])
 AC_CONFIG_SRCDIR([known_tlds.h])
 AC_CONFIG_HEADERS([config.h])
 
